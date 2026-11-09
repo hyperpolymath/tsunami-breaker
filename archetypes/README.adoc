@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Archetypes — template-only overlay data for `just repo-init`
+
+An *archetype* specialises the spine for one kind of repository (a Julia
+library, a WordPress plugin, …) **as data, not as a fork**. Each archetype is
+a directory here:
+
+    archetypes/<name>/<name>_praxis.deed  required — the contract (see below)
+    archetypes/<name>/overlay/           optional — files copied over the spine
+    archetypes/<name>/actions.lock       required when the overlay ships workflows
+
+Decision record: `docs/decisions/0003-forge-and-sustain-lifecycle.adoc`.
+Normative lifecycle: standards `spec/SCAFFOLD-LIFECYCLE.adoc`.
+
+== The contract (`<name>_praxis.deed`)
+
+A `praxis-deed` (standards `1-formats/deed/spec/abnf/deed.abnf`), read by
+`just repo-init` through `scripts/deed-field.sh`. Values are single-line
+strings:
+
+- `(metadata :archetype … :schema_version …)`.
+- `(capability :preset "<name>")` — MUST name a preset in standards
+  `.machine_readable/template-capability-gates.toml [presets]`. The archetype
+  directory name and the preset name are the same string by convention.
+- `(tokens :TOKEN "value" …)` — one pair per token. Only tokens the archetype can
+  honestly determine (`PROJECT_KIND`, `PROJECT_DOMAIN`, `LANG_STACK`,
+  `BUILD_CMD`, `TEST_CMD`, `DEPS`, `BUILD_OUTPUT_PATH`, `MAIN_FUNCTION`).
+  Values MUST NOT contain `|` (the init sed delimiter — init skips such
+  values with a warning). Judgement-only tokens
+  (`PROJECT_UNIQUE_STRENGTH`, `TARGET_AUDIENCE`, `MUST_INVARIANTS`,
+  per-repo names like `PACKAGE_NAME`) MUST be omitted so they stay
+  `UNASSIGNED` — an archetype never writes fiction.
+
+`just repo-init <name>` applies the overlay directory (if present), adds the
+token substitutions, and writes the preset into the minted repo's
+deed's `(rsr-profile)` clause. This whole `archetypes/` directory is
+template-only and is removed from the minted tree, exactly like
+`build/templates/`.
+
+== Workflows and their lock records
+
+An overlay that ships workflows ships their lock records **beside** the
+overlay, as `archetypes/<name>/actions.lock`, and never inside it. An
+`overlay/.github/workflows/actions.lock` would replace the spine's lock when
+the overlay is copied, and every spine workflow would then be refused at
+startup for want of a record. That is how the first Julia mints
+(ZeroInflatedCounts.jl, ResidualEvidenceTypes.jl) began with Lock Sync red.
+
+`just repo-init` merges the fragment into `.github/workflows/actions.lock`
+with `scripts/merge-actions-lock.rs`: entries are unioned, and a key present
+in both files with a different record stops the mint. Write the fragment with
+the authoritative tool, never by hand:
+
+. Copy the overlay workflows into an empty git repository, under
+  `.github/workflows/` and under their minted names (drop the `.in`).
+. Run `gh actions-lock --no-narrow` there, then `gh actions-lock --no-fix`
+  to check it.
+. Copy the resulting `.github/workflows/actions.lock` to
+  `archetypes/<name>/actions.lock`.
+
+Regenerate it in the same PR as any `uses:` change in the overlay.
+`tests/workflows/archetype_lock_merge_test.sh` mints each archetype's
+workflow set and runs `scripts/check-lock-sync.sh` on the merged lock.
+
+== Removing modules the preset does not declare (`prune.txt`)
+
+The spine is polyglot on purpose: it carries modules that some archetypes need
+and others must not have. An overlay adds files; it cannot subtract them — and
+a Julia package that ships `build/container/` inherits a `Containerfile` built
+for a service, which then fails `trust-container-images-pinned` in a repository
+that will never build an image.
+
+So an archetype may ship a `prune.txt` beside its contract: one path per line,
+relative to the minted root, `#` for comments, trailing `/` for a directory.
+`just repo-init` reads it *after* it has recorded what the overlay wrote and
+*before* it renames any `.in` file. It removes each listed path that exists
+and warns on stderr when an entry is stale. The removed paths are recorded in
+`MINT_REMOVES` and written to the minted variant provenance.
+
+Removal is a declaration: a line in `prune.txt` says "this preset does not
+carry this capability", and the preset in
+`.machine_readable/template-capability-gates.toml [presets]` should agree. It
+is not a place to hide files that fail a gate.
+
+== Current archetypes
+
+- `julia-library` — reference instance, harvested from
+  rsr-julia-library-template-repo's variant record (ADR-0002) and the
+  dormant scaffoldia registry's `julia/package.ncl`. The variant repo
+  remains the full hand-maintained reference until the scaffoldia
+  inversion; this archetype covers the `just repo-init` path.
+  Ships `overlay/scripts/julia-quality.jl` (the `fmt`, `fmt-check` and `lint`
+  verbs, run in a private Julia tools environment so Aqua and JuliaFormatter
+  never enter the package's own dependency set) and its
+  `provisioning_praxis.deed` override; prunes `build/container/`.
+- `rust-cli` — the preset `rust-cli` from the canon. Ships `Cargo.toml.in`,
+  `src/{lib,main}.rs.in` and `tests/cli.rs.in`, so a minted CLI has a real
+  library-plus-binary split and one integration test rather than a
+  `println!` stub that no test can fail. Prunes `build/container/` for the same
+  reason as `julia-library`: a CLI that publishes no image should not ship a
+  `Containerfile`.
+
+Declared, content to follow (presets already reserved in the canon):
+`wordpress-plugin`, `zotero-plugin`, `userscript`, `rust-ffi-lib`,
+`rust-service`, `formal-proof-lib`, `docs-site`, `affinescript-app`, `canon`.
+Do not stub them empty — an archetype exists when its contract and overlay are
+real.
