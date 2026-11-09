@@ -1,0 +1,115 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+name: Code Quality
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Estate guardrail: scope push to default branches so a PR fires once (not
+# push+PR), and cancel superseded runs. Safe — read-only PR-triggered check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check file permissions
+        run: |
+          find . -type f -perm /111 -name "*.sh" | head -10 || true
+      - name: ShellCheck (error severity)
+        run: |
+          # Error severity only: parse failures, unterminated find -exec, shebang
+          # not on line 1. Warnings are deliberately not gated — a gate that fires
+          # on style gets switched off, and these are the findings that break
+          # scripts at runtime.
+          #
+          # Vendored/upstream trees are excluded: patching a third party's test
+          # fixtures creates permanent divergence and conflicts on every sync.
+          fail=0
+          while IFS= read -r f; do
+            case "/$f" in
+              */node_modules/*|*/vendor/*|*/third_party/*|*/rescript-ecosystem/*) continue ;;
+            esac
+            shellcheck -S error "$f" || fail=1
+          done < <(git ls-files '*.sh' '*.bash')
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::shellcheck reported error-severity findings (see above)"
+            exit 1
+          fi
+          echo "✅ shellcheck: no error-severity findings"
+
+      - name: Check TODO/FIXME
+        run: |
+          echo "=== TODOs ==="
+          grep -rn "TODO\|FIXME\|HACK\|XXX" --include="*.rs" --include="*.res" --include="*.py" --include="*.ex" . | head -20 || echo "None found"
+      - name: Check for large files
+        run: |
+          find . -type f -size +1M -not -path "./.git/*" | head -10 || echo "No large files"
+      - name: EditorConfig check
+        uses: editorconfig-checker/action-editorconfig-checker@51f63319f592f97930c73d9c46184d20bd206393 # v3.0.0
+        continue-on-error: true
+  # The gates this template ships, and the proof that each one can fail.
+  #
+  # Nothing else in this workflow runs them: `just quality` is deliberately not
+  # wired here, because it needs the repository's own toolchain (zig for this
+  # tree) and a CI job that installs a toolchain to run a check is a job that
+  # gets skipped when the toolchain moves. These four gates need bash and git.
+  #
+  # tests/workflows/mint_gates_test.sh is the part that matters: it asserts that
+  # every gate above FAILS on a fixture built to fail it. A gate whose only
+  # exercised path is the passing one is the fake-gate class this estate hunts,
+  # and it cannot be caught by reading the gate.
+  mint-gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Gates
+        run: |
+          fail=0
+          for g in check-mint-tokens check-spdx-headers check-mise-language check-container-pins; do
+            echo "── ${g} ──"
+            bash "scripts/${g}.sh" || fail=1
+          done
+          exit "$fail"
+      - name: Every gate must fail on a fixture
+        run: bash tests/workflows/mint_gates_test.sh
+      - name: Language profiles (Julia and Rust scaffolds)
+        run: bash tests/e2e/language_profiles_mint_test.sh
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check documentation
+        run: |
+          MISSING=""
+          [ ! -f "README.md" ] && [ ! -f "README.adoc" ] && MISSING="$MISSING README"
+          [ ! -f "LICENSE" ] && [ ! -f "LICENSE.txt" ] && [ ! -f "LICENSE.md" ] && MISSING="$MISSING LICENSE"
+          [ ! -f "CONTRIBUTING.md" ] && [ ! -f "CONTRIBUTING.adoc" ] && [ ! -f ".github/CONTRIBUTING.md" ] && [ ! -f ".github/CONTRIBUTING.adoc" ] && MISSING="$MISSING CONTRIBUTING"
+
+          if [ -n "$MISSING" ]; then
+            echo "::warning::Missing docs:$MISSING"
+          else
+            echo "✅ Core documentation present"
+          fi
