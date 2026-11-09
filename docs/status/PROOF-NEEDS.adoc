@@ -1,0 +1,127 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+// Template: rsr-template-repo/docs/status/PROOF-NEEDS.adoc
+// Authoritative master list: ~/Desktop/PROOF-REQUIREMENTS-MASTER.adoc
+= Proof Requirements — {{PROJECT}}
+
+== Proof Tier
+
+// Assign one: T1 (Critical), T2 (High), T3 (Standard), T4 (Light), T5 (Exempt)
+*Tier*: T3 — Standard
+
+== Proof Categories
+
+[cols="1,3,1", options="header"]
+|===
+| Code | Meaning | Applies?
+
+| *TP* | Typing Proofs (type soundness, type safety) | Yes
+| *INV* | Invariant Proofs (state machines, monotonicity, bounds) |
+| *SEC* | Security Proofs (crypto, injection freedom, access control) |
+| *CONC* | Concurrency Proofs (linearizability, deadlock freedom) |
+| *ALG* | Algorithm Proofs (termination, correctness, bounds) |
+| *ABI* | ABI/FFI Proofs (memory layout, pointer safety, platform compat) | Yes
+| *DOM* | Domain-Specific Proofs (bespoke to this project) |
+|===
+
+== Mandatory Proofs (All RSR Repos)
+
+These proofs come from the rsr-template-repo and MUST be present in every repo:
+
+=== ABI/FFI Boundary Proofs (Idris2)
+
+[cols="1,3,1,3", options="header"]
+|===
+| # | Proof | Status | File
+
+| ABI-1 | Non-null pointer proofs (`So (ptr /= 0)`) | Needed | `verification/proofs/idris2/ABI/Pointers.idr`
+| ABI-2 | Memory layout correctness (`HasSize`, `HasAlignment`) | Needed | `verification/proofs/idris2/ABI/Layout.idr`
+| ABI-3 | Platform type size proofs (per platform) | Needed | `verification/proofs/idris2/ABI/Platform.idr`
+| ABI-4 | FFI function return type proofs | Needed | `verification/proofs/idris2/ABI/Foreign.idr`
+| ABI-5 | C ABI compliance (`CABICompliant`, `FieldsAligned`) | Needed | `verification/proofs/idris2/ABI/Compliance.idr`
+|===
+
+=== Typing Proofs (Prover Varies)
+
+[cols="1,3,1,3", options="header"]
+|===
+| # | Proof | Status | File
+
+| TP-1 | Core data type well-formedness | Needed | `verification/proofs/idris2/Types.idr`
+| TP-2 | Public API type safety (exported functions) | Needed | `verification/proofs/lean4/ApiTypes.lean`
+|===
+
+== Project-Specific Proofs
+
+// Fill in proofs specific to this project. Copy from PROOF-REQUIREMENTS-MASTER.adoc
+// Delete this section for T4/T5 repos
+
+[cols="1,3,1,1,1,2", options="header"]
+|===
+| # | Proof Needed | Category | Prover | Priority | File(s)
+
+| | | | | |
+|===
+
+== Dangerous Patterns (BANNED)
+
+The following MUST NOT appear anywhere in proof files:
+
+[cols="2,2,3", options="header"]
+|===
+| Pattern | Language | Meaning
+
+| `believe_me` | Idris2 | Unsafe cast / trust-me
+| `assert_total` | Idris2 | Skip totality check
+| `postulate` | Idris2/Agda | Unproven axiom
+| `sorry` | Lean4 | Incomplete proof
+| `Admitted` | Coq | Incomplete proof
+| `unsafeCoerce` | Haskell | Unsafe type cast
+| `Obj.magic` | OCaml/ | Unsafe type cast
+| `unsafe` (unaudited) | Rust | Unsafe block without safety comment
+|===
+
+CI will reject any PR introducing these patterns (enforced by `panic-attack assail`).
+
+== Prover Selection Guide
+
+The mapping is set by `standards/3-practice/PROOF-POLICY.adoc` §1, not by this
+table: where they differ, the policy wins.
+
+[cols="2,2,3", options="header"]
+|===
+| Code or obligation | Prover | Notes
+
+| Theory (type systems, lattices, metatheory, algebra) | *Agda*, rechecked in *Rocq* and *Lean* | Canonical invocation `agda --safe --without-K --cubical-compatible` (§2.1). The Rocq leg is Dedukti transport first, hand re-proof as the fallback; the Lean leg is re-proved until a released Lambdapi Lean exporter exists (§2). *No Mathlib*: a missing lemma is proved in Lean core.
+| APIs, ABIs, engineering properties | *Idris2* | `%default total`; no `believe_me` or `assert_total`.
+| Rust code | *Creusot* (with Pearlite), *Verus* | On the code. Kani for `unsafe` and FFI seams, and Aeneas where Rust implements an Agda theorem, alongside and never instead (§1.2, §4.1).
+| Ada code | *SPARK* | GNATprove.
+| Concurrency protocols | *TLA+* (a §4 exception) | A finite model check is `tested-only`, with its bounds, not `proven`.
+|===
+
+Grades are §8 Proof Witness Grades (`PWG-3` … `PWG-1`), recorded per claim in
+`PROOF-STATUS.adoc` and derived from receipts.
+
+== Proof File Locations
+
+----
+verification/proofs/
+├── idris2/          # Idris2 proofs (ABI, dependent types)
+│   ├── ABI/         # ABI-specific proofs
+│   └── *.idr        # Project-specific Idris2 proofs
+├── lean4/           # Lean recheck legs of Agda theory (core only, no Mathlib)
+│   └── *.lean
+├── agda/            # Agda theory proofs (the source of truth, §2)
+│   └── *.agda
+├── coq/             # Rocq recheck legs of Agda theory
+│   └── *.v
+└── tlaplus/         # TLA+ specs (distributed protocols)
+    └── *.tla
+----
+
+== References
+
+* Master list: `~/Desktop/PROOF-REQUIREMENTS-MASTER.adoc`
+* Proof status tracking: `PROOF-STATUS.adoc` (this repo)
+* Proven library: `proven` repo (Idris2 verified foundations)
+* Template: `rsr-template-repo/docs/status/PROOF-NEEDS.adoc`
