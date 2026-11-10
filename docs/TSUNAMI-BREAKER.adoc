@@ -72,7 +72,7 @@ its pings arrive long after the push that caused them.
   between; usually passes but now fails (needs run history); a failure type
   you have not seen before (needs a baseline from an earlier session).
 * *Per viewer.* Each login has its own corrections and baseline, saved in
-  `var/viewers.bin`. One person's "noise" never hides anything from another.
+  `var/viewers.json`. One person's "noise" never hides anything from another.
 
 == Run it
 

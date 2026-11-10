@@ -37,15 +37,28 @@ defmodule TsunamiBreaker.ViewerStoreTest do
   end
 
   @tag :tmp_dir
-  test "a hand-edited file cannot create new atoms", %{tmp_dir: dir} do
+  test "a hand-edited file cannot create new atoms or crash startup", %{tmp_dir: dir} do
     path = Path.join(dir, "viewers.json")
 
     File.write!(
       path,
-      ~s({"v":{"overrides":[[["no_such_atom_x9","CI","*"],"noise"],[["agent_session","CI","*"],"noise"]],"baseline":[]}})
+      ~s({"v":{"overrides":[[["no_such_atom_x9","CI","*"],"noise"],[[1,"x","*"],"noise"],[["agent_session",[2,"x"],"*"],"noise"],[["agent_session","CI","*"],"noise"]],"baseline":[]}})
     )
 
     {:ok, s} = ViewerStore.start_link(path: path, name: nil)
     assert ViewerStore.get("v", s).overrides == %{{:agent_session, "CI", "*"} => :noise}
+  end
+
+  @tag :tmp_dir
+  test "a key with no workflow name survives a restart", %{tmp_dir: dir} do
+    path = Path.join(dir, "viewers.json")
+    key = {:agent_session, nil, "claude/*"}
+
+    {:ok, s1} = ViewerStore.start_link(path: path, name: nil)
+    ViewerStore.set_override("v", key, :signal, s1)
+    Agent.stop(s1)
+
+    {:ok, s2} = ViewerStore.start_link(path: path, name: nil)
+    assert ViewerStore.get("v", s2).overrides == %{key => :signal}
   end
 end

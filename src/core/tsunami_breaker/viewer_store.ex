@@ -103,13 +103,16 @@ defmodule TsunamiBreaker.ViewerStore do
   defp key_to_json({src, what, pat}), do: [to_string(src), what, pat]
 
   # Only atoms that already exist are accepted, so a hand-edited file cannot create new ones.
-  defp key_from_json([src, [cause, reason], pat]) when is_binary(pat) do
+  defp key_from_json([src, [cause, reason], pat])
+       when is_binary(src) and is_binary(cause) and is_binary(reason) and is_binary(pat) do
     {existing_atom(src), {existing_atom(cause), existing_atom(reason)}, pat}
   rescue
     ArgumentError -> nil
   end
 
-  defp key_from_json([src, what, pat]) when is_binary(what) and is_binary(pat) do
+  # A workflow can be nil when a pasted CI title did not parse.
+  defp key_from_json([src, what, pat])
+       when is_binary(src) and (is_binary(what) or is_nil(what)) and is_binary(pat) do
     {existing_atom(src), what, pat}
   rescue
     ArgumentError -> nil
