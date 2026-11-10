@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Template damage: what rsr-template-repo shipped, why it survived, and what now stops it
+= Template damage: what tsunami-breaker shipped, why it survived, and what now stops it
 :toc:
 :toclevels: 3
 :date: 2026-10-30
@@ -13,7 +13,7 @@ not performed — see <<Remediation>>.
 `JuliaPackageSpitter.jl` was reported as a broken Julia package: a `mise.toml`
 declaring Python, Node, Go, Rust, Java, Bun and Cargo for a Julia library and no
 Julia; a `Containerfile` built from two floating `:latest` stages and otherwise
-consisting of TODO comments; `{{PROJECT_NAME}}` and a `tier` token sitting in
+consisting of TODO comments; `tsunami-breaker` and a `tier` token sitting in
 committed files; an SPDX gate that passed without reading a single file; a
 `Justfile` whose `fmt`, `fmt-check` and `lint` recipes are `@echo` statements, so
 `just quality` printed "All quality checks passed!" having run only `Pkg.test()`.
@@ -29,7 +29,7 @@ repository fixes one repository; fixing it here is what stops the next mint.
 | Search | Result
 
 | `gh search repos rsr-template --owner hyperpolymath --json fullName,description`
-| `hyperpolymath/rsr-template-repo` — the only match. There is no separate
+| `hyperpolymath/tsunami-breaker` — the only match. There is no separate
   Julia template repository: `rsr-julia-library-template-repo` and its variants
   return 404 (probed), so `JuliaPackageSpitter.jl` came from this template plus
   the `julia-library` archetype.
@@ -86,7 +86,7 @@ anywhere, in any repository, for two months.
 
 The placeholder gate excludes `Justfile` and `*.just` (they contain just's own
 `{{...}}` interpolation), and the mint's token list is a fixed set. Between the
-two, `Justfile project := "{{PROJECT_NAME}}"`, `tier := "…"` (the `tier` brace token),
+two, `Justfile project := "tsunami-breaker"`, `tier := "…"` (the `tier` brace token),
 `.envrc`, `.reuse/dep5`, `Containerfile`, `devcontainer.json` and
 `.devcontainer/Containerfile` kept their braces all the way into commits.
 
@@ -320,7 +320,7 @@ four gates against the clone — the same code a minted repository will run, not
 grep. Reproducible:
 
 ----
-gh api -X GET search/code -f q='org:hyperpolymath "{{PROJECT_NAME}}"' \
+gh api -X GET search/code -f q='org:hyperpolymath "tsunami-breaker"' \
   --jq '[.items[].repository.full_name] | unique | .[]'
 scripts/survey-template-damage.sh --tsv owner/name owner/name …
 ----
@@ -332,13 +332,13 @@ separate query, so the populations overlap and none is a subset of another):
 |===
 | Query | Files | What it establishes
 
-| `org:hyperpolymath "{{PROJECT_NAME}}"` | 1536 | Unfilled tokens are not one
+| `org:hyperpolymath "tsunami-breaker"` | 1536 | Unfilled tokens are not one
   repository's accident.
 | `org:hyperpolymath filename:mise.toml python` | 175 | 175 `mise.toml` files
   mention Python. Python is banned estate-wide.
 | `org:hyperpolymath filename:Containerfile ":latest"` | 421 | 421 `Containerfile`
   files carry a floating tag somewhere.
-| `org:hyperpolymath filename:Justfile "{{PROJECT_NAME}}"` | 33 | The mint's
+| `org:hyperpolymath filename:Justfile "tsunami-breaker"` | 33 | The mint's
   own skipped-file class, in 33 `Justfile`s.
 |===
 
@@ -437,7 +437,7 @@ JuliaPackageSpitter.jl  mise:  banned tool(s) declared: black go isort java jest
 The template is fixed here; the 111 repositories are not. Each needs a
 per-repository change, and the shape of it is now mechanical:
 
-. Copy `scripts/render-mise.sh` and `build/just/provision-lib.sh` into the repository from the same revision of `hyperpolymath/rsr-template-repo`. Older mints do not contain `scripts/render-mise.sh`, and the renderer exits with an error when `build/just/provision-lib.sh` is missing.
+. Copy `scripts/render-mise.sh` and `build/just/provision-lib.sh` into the repository from the same revision of `hyperpolymath/tsunami-breaker`. Older mints do not contain `scripts/render-mise.sh`, and the renderer exits with an error when `build/just/provision-lib.sh` is missing.
 . Re-render the toolchain: `scripts/render-mise.sh --root .` in the repository,
    then delete the `[alias]` block (it routes `build`/`test`/`lint` to
    cargo/npm/go/ruff/prettier/black, which is how a Julia package came to have a
