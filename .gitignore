@@ -144,3 +144,8 @@ verification/proofs/coq/.*.aux
 # Agda compiled proof artifacts
 verification/proofs/agda/*.agdai
 
+
+# tsunami-breaker (Phoenix): built assets, local per-viewer store
+/priv/static/assets/
+/priv/static/cache_manifest.json
+/var/

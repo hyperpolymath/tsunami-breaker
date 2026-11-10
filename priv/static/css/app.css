@@ -1,0 +1,174 @@
+/*
+  tsunami-breaker stylesheet (CSS, not Elixir).
+
+  In plain language: CSS is a list of "for things matching X, look like Y"
+  rules. The block just below defines named colours ("tokens") once; every
+  other rule refers to those names, so light and dark mode only need the
+  names redefined, not every rule rewritten.
+*/
+
+:root {
+  color-scheme: light;
+  --surface-0: #f4f3f0;   /* page background */
+  --surface-1: #fcfcfb;   /* cards and chart background */
+  --border: #e2e0da;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7973;
+
+  /* Chart series, checked with a colour-blindness validator. */
+  --series-flood: #b5b3ab;   /* the flood: deliberately grey and quiet */
+  --series-yours: #2a78d6;   /* your work: blue */
+  --series-stands: #eb6834;  /* stands out: orange */
+  --series-other: #1baf7a;   /* residual: aqua (always shown with a label) */
+
+  /* Status colours: only ever used with an icon and a word, never alone. */
+  --critical: #d03b3b;
+  --warning: #fab219;
+  --good: #0ca30c;
+}
+
+/* Dark mode: follow the operating system's setting unless the page says light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #383835;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a998f;
+    --series-flood: #5c5b56;
+    --series-yours: #3987e5;
+    --series-stands: #d95926;
+    --series-other: #199e70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #383835;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #9a998f;
+  --series-flood: #5c5b56;
+  --series-yours: #3987e5;
+  --series-stands: #d95926;
+  --series-other: #199e70;
+}
+
+/* Base text and page layout. */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.page { max-width: 1120px; margin: 0 auto; padding: 20px 16px 64px; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 17px; }
+h3 { font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+a { color: var(--series-yours); }
+code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; }
+.muted { color: var(--text-muted); }
+.small { font-size: 13px; }
+
+/* A "card" is a white panel with a thin border. */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 0 0 16px;
+  min-width: 0;            /* lets wide contents scroll inside instead of stretching the page */
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Top bar. */
+.topbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.brand { font-weight: 700; font-size: 20px; }
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--border); font-size: 12px; color: var(--text-secondary);
+}
+
+/* Buttons and form fields. */
+button, .btn {
+  font: inherit; font-size: 14px; cursor: pointer;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+}
+button:hover { border-color: var(--text-muted); }
+button[disabled] { opacity: .5; cursor: not-allowed; }
+button.primary { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+button.link { border: none; background: none; padding: 0; color: var(--series-yours); font-size: 13px; }
+input, textarea {
+  font: inherit; font-size: 14px; color: var(--text-primary);
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+}
+textarea { width: 100%; min-height: 140px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* The diagnosis at the top: one big sentence, then plain-language bullets. */
+.hero h1 { font-size: 26px; }
+.hero ul { margin: 8px 0 0; padding-left: 20px; color: var(--text-secondary); }
+.hero li { margin: 4px 0; }
+
+/* The five lane counters. */
+.lanes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 760px) { .lanes { grid-template-columns: repeat(2, 1fr); } }
+.lane {
+  text-align: left; padding: 12px; border-radius: 10px; background: var(--surface-1);
+  border: 1px solid var(--border); border-top: 4px solid var(--lane-color, var(--border));
+}
+.lane.active { outline: 2px solid var(--text-primary); }
+.lane .n { font-size: 28px; font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
+.lane .label { font-weight: 600; display: block; }
+.lane .desc { font-size: 12px; color: var(--text-muted); display: block; }
+
+/* Lists of notifications. */
+.items { list-style: none; margin: 0; padding: 0; }
+.items li { padding: 8px 0; border-top: 1px solid var(--border); }
+.items li:first-child { border-top: none; }
+.items .meta { font-size: 12px; color: var(--text-muted); }
+.tag {
+  display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--text-secondary); margin-right: 4px;
+}
+/* Status tags always show an icon character and a word; the colour is extra. */
+.tag.critical { border-color: var(--critical); color: var(--critical); }
+.tag.warning { border-color: var(--warning); color: var(--text-primary); }
+
+/* Charts (drawn as SVG, the web's built-in vector drawing format). */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--text-secondary); font-size: 11px; }
+.chart .axis { stroke: var(--border); }
+.chart .strong { fill: var(--text-primary); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-secondary); margin: 6px 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.scroll-x { overflow-x: auto; }
+
+/* Causal chain: boxes joined by arrows. */
+.chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin: 8px 0 12px; }
+.step {
+  flex: 1 1 150px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-0); font-size: 13px;
+}
+.step b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.arrow { align-self: center; color: var(--text-muted); }
+
+/* Tables (the "show as table" views behind charts). */
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; margin-top: 6px; }
+
+/* Proposals are shown but never executed in this version. */
+.proposal { border-left: 3px solid var(--border); padding: 4px 10px; margin: 8px 0; }
+.error { color: var(--critical); }
+
+/* Flash messages from Phoenix. */
+.flash { position: fixed; top: 12px; right: 12px; padding: 10px 14px; border-radius: 8px; background: var(--surface-1); border: 1px solid var(--border); z-index: 10; }
