@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.PasteParserTest do
   use ExUnit.Case, async: true
   alias TsunamiBreaker.Catch.PasteParser

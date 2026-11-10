@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Event do
   @moduledoc """
   One normalised thing that pinged (or could ping) the viewer.

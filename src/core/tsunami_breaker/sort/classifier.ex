@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Sort.Classifier do
   @moduledoc """
   Layer 2 – Sort. Says *who started* each event (source) and *why it reached

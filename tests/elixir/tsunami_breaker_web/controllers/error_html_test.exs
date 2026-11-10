@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.ErrorHTMLTest do
   use TsunamiBreakerWeb.ConnCase, async: true
 

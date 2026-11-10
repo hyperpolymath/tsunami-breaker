@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Rescue do
   @moduledoc """
   Layer 4 – Rescue. Sorts every event into exactly one lane, so nothing is

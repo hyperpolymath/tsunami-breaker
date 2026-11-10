@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.CoreComponents do
   @moduledoc """
   Provides core UI components.

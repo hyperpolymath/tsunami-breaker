@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker do
   @moduledoc """
   TsunamiBreaker keeps the contexts that define your domain

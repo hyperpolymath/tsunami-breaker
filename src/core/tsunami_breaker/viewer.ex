@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Viewer do
   @moduledoc """
   Who is looking. "Noise" is decided per viewer, never globally: the same

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Analysis do
   @moduledoc """
   Runs layers 2–4 over a batch of caught events for one viewer and returns

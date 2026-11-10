@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Catch.Fetch do
   @moduledoc """
   Layer 1 – Catch, live. One button press = one bounded, read-only sweep:

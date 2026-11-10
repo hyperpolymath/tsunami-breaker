@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.DashboardLiveTest do
   use TsunamiBreakerWeb.ConnCase
   import Phoenix.LiveViewTest

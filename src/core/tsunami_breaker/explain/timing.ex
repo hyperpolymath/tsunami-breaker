@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Explain.Timing do
   @moduledoc """
   Layer 3 – the *when*: frequency, bursts, onset and duration.

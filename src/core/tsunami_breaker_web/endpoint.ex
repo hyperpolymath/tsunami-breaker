@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :tsunami_breaker
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Catch.GitHub do
   @moduledoc """
   Read-only GitHub client. **It can only send GET requests**: there is no

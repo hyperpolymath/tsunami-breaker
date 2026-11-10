@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Filter.Anomalies do
   @moduledoc """
   Rules that make something stand out even inside a flood.

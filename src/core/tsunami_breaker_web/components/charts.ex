@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.Charts do
   @moduledoc """
   The three pictures, drawn on the server as SVG (the browser's built-in

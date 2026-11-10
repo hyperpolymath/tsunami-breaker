@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Explain.Fishbone do
   @moduledoc """
   Layer 3 – the *why*, as an Ishikawa (fishbone) diagram: the effect at the

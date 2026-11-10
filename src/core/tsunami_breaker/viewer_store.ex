@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.ViewerStore do
   @moduledoc """
   Remembers each viewer's own idea of noise: their overrides ("this is noise

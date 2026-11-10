@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.Layouts do
   @moduledoc """
   This module holds different layouts used by your application.

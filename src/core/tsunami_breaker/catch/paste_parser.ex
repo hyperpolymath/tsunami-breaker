@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Catch.PasteParser do
   @moduledoc """
   Reads text copied from github.com/notifications (Inbox or Done tab) and turns

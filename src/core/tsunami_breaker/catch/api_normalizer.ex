@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Catch.ApiNormalizer do
   @moduledoc "Turns GitHub API JSON (notifications, workflow runs) into `TsunamiBreaker.Event`s."
 

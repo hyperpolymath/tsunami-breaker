@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.ErrorHTML do
   @moduledoc """
   This module is invoked by your endpoint in case of errors on HTML requests.

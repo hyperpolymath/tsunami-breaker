@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Filter.Fingerprint do
   @moduledoc """
   The noise filter's memory: what the flood *looks like*, so it can be subtracted.

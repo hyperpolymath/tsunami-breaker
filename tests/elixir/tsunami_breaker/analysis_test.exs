@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.AnalysisTest do
   use ExUnit.Case, async: true
   alias TsunamiBreaker.{Analysis, Viewer, Event}

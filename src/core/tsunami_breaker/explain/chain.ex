@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreaker.Explain.Chain do
   @moduledoc """
   Layer 3 – the *how*: push → gate → failure → ping.

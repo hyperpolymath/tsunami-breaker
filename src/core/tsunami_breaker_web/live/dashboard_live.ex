@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 defmodule TsunamiBreakerWeb.DashboardLive do
   @moduledoc """
   The one screen. Load a flood (sample, pasted page, or a read-only GitHub
