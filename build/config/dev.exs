@@ -71,4 +71,4 @@ config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
 # Per-viewer noise preferences (overrides + baseline) are saved here.
-config :tsunami_breaker, viewer_store_path: Path.expand("../../var/viewers.bin", __DIR__)
+config :tsunami_breaker, viewer_store_path: Path.expand("../../var/viewers.json", __DIR__)

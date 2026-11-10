@@ -49,22 +49,73 @@ defmodule TsunamiBreaker.ViewerStore do
     end)
   end
 
+  # The file holds only what each viewer changed (overrides and baseline), as
+  # JSON. Never an Erlang term: decoding a term from disk is a deserialisation
+  # risk (CWE-502), and the rest of a Viewer (compiled regexes) does not
+  # survive an OTP upgrade anyway.
   defp load(nil), do: %{}
 
   defp load(path) do
-    with {:ok, bin} <- File.read(path), {:ok, m} <- safe_decode(bin), do: m, else: (_ -> %{})
-  end
-
-  defp safe_decode(bin) do
-    {:ok, :erlang.binary_to_term(bin, [:safe])}
-  rescue
-    _ -> :error
+    with {:ok, bin} <- File.read(path),
+         {:ok, %{} = m} <- Jason.decode(bin) do
+      Map.new(m, fn {login, data} -> {login, from_json(login, data)} end)
+    else
+      _ -> %{}
+    end
   end
 
   defp save(%{path: nil}), do: :ok
 
   defp save(%{path: path, viewers: v}) do
     File.mkdir_p!(Path.dirname(path))
-    File.write!(path, :erlang.term_to_binary(v))
+
+    File.write!(
+      path,
+      Jason.encode!(Map.new(v, fn {login, viewer} -> {login, to_json(viewer)} end))
+    )
   end
+
+  defp to_json(%Viewer{} = v) do
+    %{
+      "overrides" => for({k, val} <- v.overrides, do: [key_to_json(k), Atom.to_string(val)]),
+      "baseline" => for({repo, wf} <- v.baseline, do: [repo, wf])
+    }
+  end
+
+  defp from_json(login, data) when is_map(data) do
+    overrides =
+      for [k, val] <- List.wrap(data["overrides"]),
+          key = key_from_json(k),
+          val in ["noise", "signal"],
+          into: %{},
+          do: {key, String.to_existing_atom(val)}
+
+    baseline = for [repo, wf] <- List.wrap(data["baseline"]), into: MapSet.new(), do: {repo, wf}
+    Viewer.new(login: login, overrides: overrides, baseline: baseline)
+  end
+
+  defp from_json(login, _), do: Viewer.new(login: login)
+
+  # Fingerprint keys are {source, workflow, pattern} or {source, {cause, reason}, pattern}.
+  defp key_to_json({src, {cause, reason}, pat}),
+    do: [to_string(src), [to_string(cause), to_string(reason)], pat]
+
+  defp key_to_json({src, what, pat}), do: [to_string(src), what, pat]
+
+  # Only atoms that already exist are accepted, so a hand-edited file cannot create new ones.
+  defp key_from_json([src, [cause, reason], pat]) when is_binary(pat) do
+    {existing_atom(src), {existing_atom(cause), existing_atom(reason)}, pat}
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp key_from_json([src, what, pat]) when is_binary(what) and is_binary(pat) do
+    {existing_atom(src), what, pat}
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp key_from_json(_), do: nil
+
+  defp existing_atom(s) when is_binary(s), do: String.to_existing_atom(s)
 end
