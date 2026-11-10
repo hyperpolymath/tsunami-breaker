@@ -1,0 +1,176 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= tsunami-breaker
+:toc:
+
+Catches a GitHub notification flood and explains it, so a non-specialist can
+look and say "oh, *that* is what is happening".
+
+Built for an estate of about 400 repos. About 12 parallel Claude Code sessions
+push to `claude/*` branches, every push trips estate-wide gates, the gates
+fail, and every failure pings the owner.
+
+*This version is read-only* (layers 1-4). It only sends `GET` requests to
+GitHub, and it contains no write code.
+
+== What it says about the sample
+
+The sample is the real inbox page from 9 Nov 2026, in
+`priv/fixtures/hyperpolymath_inbox_2026-11-09.md`. The tool reports:
+
+____
+*11 Claude sessions, 4 gates, 1 genuine failure on main*
+____
+
+[cols="2,1,5"]
+|===
+| Lane | Count | What is in it
+
+| Stands out | 1 | `marches` · Actions lock failing on `main`
+| Needs you | 1 | mention on `valence-shell #223`
+| Your work | 7 | reviews and comments on PRs opened from your account
+| Quarantine | 16 | agent-session CI failures on `claude/*`: kept and counted, never deleted
+| Unmatched | 0 |
+|===
+
+The 4 gates are Dogfood Gate, Estate Rules, Check: Workflow security lint and
+Gate: Code quality. A workflow counts as a gate if its name looks like a gate
+or it fails in 3 or more repos. The other failing workflows (rust-ci, Cargo
+Audit, Proven Tests and Benches, Dashboard Check) are the repos' own CI. The
+UI shows the rule, and each viewer can change it.
+
+The tool also shows that the Dogfood Gate pings are for runs that started
+earlier than the rest (lower run numbers). That gate is slow or is re-run, so
+its pings arrive long after the push that caused them.
+
+== Layers
+
+[cols="1,4,3"]
+|===
+| # | Layer | Status
+
+| 1 | *Catch*: pasted notifications page, notifications API, workflow-run history | Read side done. *Mark done* is a proposal only.
+| 2 | *Sort*: source (agent session, human, bot, workflow) × cause (gate, project CI, review, mention) | Done
+| 3 | *Explain*: timing (rate, bursts, onset, duration, late workflows), causal chain, fishbone | Done
+| 4 | *Rescue*: anomalies, needs-you, your work; the quarantine is visible and countable | Done
+| 5 | Act: mute, pause or cancel, stop gates on scratch branches (propose, then approve; reversible) | Not yet
+| 6 | Remember: calm-state snapshot, drift, restore | Not yet
+| 7 | Share: GitHub App with view-only and act roles | Not yet
+|===
+
+=== The noise filter
+
+* *Fingerprint* = source × workflow × branch pattern, for example
+  `{agent session, Dogfood Gate, claude/*}`. Keys group into families
+  (`{agent session, anything, claude/*}`), so many rare keys from one flood
+  still count as one flood.
+* The filter learns a key as noise when the key repeats, or when its family
+  is large and spread across repos.
+* An item is *never* noise if it is on a default branch, if it asks for you
+  (mention, review request, security alert, assignment), or if you said
+  "not noise for me".
+* *Anomaly rules*: fails on the default branch; keeps failing with no pass in
+  between; usually passes but now fails (needs run history); a failure type
+  you have not seen before (needs a baseline from an earlier session).
+* *Per viewer.* Each login has its own corrections and baseline, saved in
+  `var/viewers.bin`. One person's "noise" never hides anything from another.
+
+== Run it
+
+You need Elixir 1.15 or later and Erlang/OTP 26 or later.
+
+[source,bash]
+----
+mix setup
+----
+
+[source,bash]
+----
+mix phx.server
+----
+
+Open http://localhost:4000. It starts on the sample. You can also paste any
+page from github.com/notifications (Inbox or Done) into *Paste a
+notifications page…*.
+
+=== Against your real account (read-only)
+
+Create a *classic* personal access token with the `notifications` and `repo`
+scopes. As far as we know, fine-grained tokens cannot read the notifications
+API. Then start the server with the token:
+
+[source,bash]
+----
+export TSUNAMI_GITHUB_TOKEN=your_token_here
+----
+
+[source,bash]
+----
+mix phx.server
+----
+
+*Fetch from GitHub* then does one bounded sweep: who you are, up to 10 pages
+of notifications, 1 page of run history for up to 25 of the repos involved,
+and up to 20 "who actually commented" lookups (to tell bots from people). It
+stops early if your hourly API budget is low, refuses to fetch again within
+1 minute, and never polls on its own.
+
+The notifications API does not return threads marked *done*. History behind
+the Done tab comes from each repo's *workflow-run* list, which keeps every run.
+You can also paste Done-tab pages. The tool counts a thread pasted twice once.
+
+== Tests
+
+[source,bash]
+----
+mix test
+----
+
+Tests pin the diagnosis above, the single anomaly, the lane totals (nothing
+dropped), per-viewer isolation, each anomaly rule, the API normalisers, and
+"the GitHub client only sends GET".
+
+== Where things are in the template layout
+
+----
+mix.exs, mix.lock, .formatter.exs   Mix project files (root, tool-required)
+build/config/                       Mix config (config_path in mix.exs)
+priv/                               static files and the sample fixture
+src/core/tsunami_breaker/
+  event.ex                 one normalised shape for everything caught
+  catch/paste_parser.ex    pasted notifications page -> events
+  catch/github.ex          read-only GitHub client (GET only)
+  catch/api_normalizer.ex  API JSON -> events
+  catch/fetch.ex           one bounded live sweep
+  sort/classifier.ex       source, cause, gates
+  filter/fingerprint.ex    learn the flood's shape and subtract it
+  filter/anomalies.ex      what breaks the pattern
+  rescue/rescue.ex         five lanes, every event in exactly one
+  explain/timing.ex        when
+  explain/chain.ex         how (push -> gate -> failure -> ping)
+  explain/fishbone.ex      why (Ishikawa)
+  analysis.ex              runs it all; pure, no network
+  viewer.ex, viewer_store.ex   per-viewer settings and memory
+src/core/tsunami_breaker_web/
+  live/dashboard_live.ex   the one screen
+  components/charts.ex     timing bars, session-to-gate flow, fishbone (SVG)
+src/core/assets/           stock Phoenix JavaScript
+tests/elixir/              ExUnit tests (test_paths in mix.exs)
+----
+
+=== The parts that are not Elixir, in plain language
+
+* *`priv/static/css/app.css`* (CSS): rules for how things *look*. It names
+  the colours once at the top, so dark mode only changes those names.
+* *SVG inside `charts.ex`*: the browser's built-in drawing format, a list of
+  lines, rectangles and text at coordinates. Elixir calculates every
+  coordinate. The browser only draws them.
+* *`src/core/assets/js/app.js`* (JavaScript): the stock Phoenix file that
+  keeps the live connection between the page and the server. Not changed.
+* *HEEx templates* (the `~H"""…"""` blocks) are HTML with Elixir in braces.
+
+=== Julia
+
+Not used yet. The analysis counts and groups hundreds to thousands of events,
+and Elixir does that in milliseconds. A Julia engine over ports becomes useful
+if we add statistical baselines across months of run history (for example,
+change detection on each workflow's failure rate).
