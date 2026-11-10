@@ -82,13 +82,26 @@ defmodule TsunamiBreaker.ViewerStore do
     }
   end
 
+  # Every name a fingerprint key can hold: sources and causes (Classifier) and
+  # notification reasons (PasteParser, ApiNormalizer). They are listed here on
+  # purpose, not looked up with String.to_existing_atom/1: in a fresh VM the
+  # modules that use those atoms may not be loaded yet, which would drop valid
+  # saved corrections. The file still cannot create new atoms.
+  @key_atoms ~w(agent_session human bot workflow unknown
+                gate project_ci review comment mention review_request security assignment other
+                ci_activity author team_mention review_requested security_alert assign
+                state_change subscribed manual invitation approval_requested)a
+             |> Map.new(&{Atom.to_string(&1), &1})
+
+  @values %{"noise" => :noise, "signal" => :signal}
+
   defp from_json(login, data) when is_map(data) do
     overrides =
-      for [k, val] <- List.wrap(data["overrides"]),
+      for [k, v] <- List.wrap(data["overrides"]),
           key = key_from_json(k),
-          val in ["noise", "signal"],
+          val = Map.get(@values, v),
           into: %{},
-          do: {key, String.to_existing_atom(val)}
+          do: {key, val}
 
     baseline = for [repo, wf] <- List.wrap(data["baseline"]), into: MapSet.new(), do: {repo, wf}
     Viewer.new(login: login, overrides: overrides, baseline: baseline)
@@ -102,23 +115,25 @@ defmodule TsunamiBreaker.ViewerStore do
 
   defp key_to_json({src, what, pat}), do: [to_string(src), what, pat]
 
-  # Only atoms that already exist are accepted, so a hand-edited file cannot create new ones.
-  defp key_from_json([src, [cause, reason], pat])
-       when is_binary(src) and is_binary(cause) and is_binary(reason) and is_binary(pat) do
-    {existing_atom(src), {existing_atom(cause), existing_atom(reason)}, pat}
-  rescue
-    ArgumentError -> nil
+  # An unknown or malformed part makes the whole key nil, and the entry is skipped.
+  defp key_from_json([src, [cause, reason], pat]) when is_binary(pat) do
+    with {:ok, s} <- name(src), {:ok, c} <- name(cause), {:ok, r} <- name(reason) do
+      {s, {c, r}, pat}
+    else
+      _ -> nil
+    end
   end
 
   # A workflow can be nil when a pasted CI title did not parse.
   defp key_from_json([src, what, pat])
-       when is_binary(src) and (is_binary(what) or is_nil(what)) and is_binary(pat) do
-    {existing_atom(src), what, pat}
-  rescue
-    ArgumentError -> nil
+       when (is_binary(what) or is_nil(what)) and is_binary(pat) do
+    case name(src) do
+      {:ok, s} -> {s, what, pat}
+      :error -> nil
+    end
   end
 
   defp key_from_json(_), do: nil
 
-  defp existing_atom(s) when is_binary(s), do: String.to_existing_atom(s)
+  defp name(s), do: Map.fetch(@key_atoms, s)
 end

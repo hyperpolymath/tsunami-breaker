@@ -61,4 +61,18 @@ defmodule TsunamiBreaker.ViewerStoreTest do
     {:ok, s2} = ViewerStore.start_link(path: path, name: nil)
     assert ViewerStore.get("v", s2).overrides == %{key => :signal}
   end
+
+  @tag :tmp_dir
+  test "every notification reason the parsers produce survives a restart", %{tmp_dir: dir} do
+    path = Path.join(dir, "viewers.json")
+    reasons = [:other | Map.values(TsunamiBreaker.Catch.PasteParser.reasons())] |> Enum.uniq()
+    keys = for r <- reasons, do: {:unknown, {:comment, r}, "*"}
+
+    {:ok, s1} = ViewerStore.start_link(path: path, name: nil)
+    for k <- keys, do: ViewerStore.set_override("v", k, :noise, s1)
+    Agent.stop(s1)
+
+    {:ok, s2} = ViewerStore.start_link(path: path, name: nil)
+    assert ViewerStore.get("v", s2).overrides |> Map.keys() |> Enum.sort() == Enum.sort(keys)
+  end
 end
