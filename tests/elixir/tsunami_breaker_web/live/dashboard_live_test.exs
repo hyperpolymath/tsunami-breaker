@@ -56,4 +56,17 @@ defmodule TsunamiBreakerWeb.DashboardLiveTest do
 
     assert html =~ "Quarantine · 16"
   end
+
+  test "an unknown key from the browser is refused, not decoded", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/")
+
+    html =
+      render_hook(view, "override", %{
+        "key" => Base.url_encode64(:erlang.term_to_binary({:evil, "x", "*"})),
+        "value" => "noise"
+      })
+
+    assert html =~ "no longer on screen"
+    assert html =~ "Quarantine · 16"
+  end
 end

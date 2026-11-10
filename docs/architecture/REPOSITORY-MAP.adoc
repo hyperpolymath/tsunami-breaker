@@ -175,7 +175,7 @@ predecessors did.
 
 | `priv/`
 | optional
-| elixir/OTP: an
+| elixir/OTP: the priv dir of an OTP application is fixed at the project root (Application.app_dir/2); tsunami-breaker serves static files and fixtures from it
 
 | `scripts/`
 | yes

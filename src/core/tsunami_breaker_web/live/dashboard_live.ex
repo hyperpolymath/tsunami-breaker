@@ -132,9 +132,16 @@ defmodule TsunamiBreakerWeb.DashboardLive do
   end
 
   def handle_event("override", %{"key" => enc, "value" => value}, socket) do
-    value = %{"noise" => :noise, "signal" => :signal, "clear" => nil}[value]
-    ViewerStore.set_override(socket.assigns.login, decode_key(enc), value)
-    {:noreply, analyse(socket)}
+    case {Map.fetch(%{"noise" => :noise, "signal" => :signal, "clear" => nil}, value),
+          socket.assigns.analysis && decode_key(enc, socket.assigns.analysis)} do
+      {{:ok, v}, key} when key != nil ->
+        ViewerStore.set_override(socket.assigns.login, key, v)
+        {:noreply, analyse(socket)}
+
+      _ ->
+        {:noreply,
+         assign(socket, error: "That item is no longer on screen. Reload and try again.")}
+    end
   end
 
   @impl true
@@ -200,10 +207,18 @@ defmodule TsunamiBreakerWeb.DashboardLive do
 
   defp token, do: Application.get_env(:tsunami_breaker, :github_token)
 
+  # A key goes to the browser as an opaque id. The id is never decoded: the
+  # server finds the key it stands for among keys it sent itself, so a value
+  # from the browser is never deserialised.
   def encode_key(k), do: k |> :erlang.term_to_binary() |> Base.url_encode64(padding: false)
 
-  defp decode_key(s),
-    do: s |> Base.url_decode64!(padding: false) |> :erlang.binary_to_term([:safe])
+  defp decode_key(id, %Analysis{} = a) do
+    a.quarantine_by_key
+    |> Enum.map(& &1.key)
+    |> Enum.concat(Enum.map(a.lanes.your_work, &Fingerprint.key(&1, a.viewer)))
+    |> Enum.concat(Map.keys(a.viewer.overrides))
+    |> Enum.find(&(encode_key(&1) == id))
+  end
 
   defp format_error({:http, 401, _}),
     do: "the token was refused (401). Check it's a classic token with the notifications scope."
