@@ -41,6 +41,10 @@ predecessors did.
 | yes
 | -
 
+| `.formatter.exs`
+| optional
+| elixir: `mix format` reads its config from the project root
+
 | `.gitattributes`
 | yes
 | -
@@ -165,6 +169,18 @@ predecessors did.
 | yes
 | the toolchain: every tool at latest (PROVISIONING-STANDARD §4)
 
+| `mix.exs`
+| optional
+| elixir: Mix reads the project file from the root only, and build/just/provision.just runs mix at the root
+
+| `mix.lock`
+| optional
+| elixir: Mix writes the dependency lock beside mix.exs
+
+| `priv/`
+| optional
+| elixir/OTP: the priv dir of an OTP application is fixed at the project root (Application.app_dir/2); tsunami-breaker serves static files and fixtures from it
+
 | `rsr-template-repo_chora.deed`
 | yes
 | the repo deed: universal AI entry point; family-7 allocation manifest + ply tree folded in (standards#837 pilot). Filename carries the repo slug (deed dispatch <stem>_chora.deed), so repo-init renames it at mint
@@ -249,7 +265,6 @@ your own repo - but do not read their emptiness as neglect here.
 | `src/aspects/security/`
 | `src/bridges/`
 | `src/contracts/`
-| `src/core/`
 | `src/definitions/`
 | `src/errors/`
 | `src/interface/generated/`

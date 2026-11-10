@@ -95,4 +95,4 @@ tests/
 ?mix.exs                   # elixir: Mix reads the project file from the root only, and build/just/provision.just runs mix at the root
 ?mix.lock                  # elixir: Mix writes the dependency lock beside mix.exs
 ?.formatter.exs            # elixir: `mix format` reads its config from the project root
-?priv/                     # elixir/OTP: an application's priv dir is fixed at the project root (Application.app_dir/2); tsunami-breaker serves static files and fixtures from it
+?priv/                     # elixir/OTP: the priv dir of an OTP application is fixed at the project root (Application.app_dir/2); tsunami-breaker serves static files and fixtures from it
