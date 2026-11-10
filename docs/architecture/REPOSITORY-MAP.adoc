@@ -41,6 +41,10 @@ predecessors did.
 | yes
 | -
 
+| `.formatter.exs`
+| optional
+| elixir: `mix format` reads its config from the project root
+
 | `.gitattributes`
 | yes
 | -
@@ -121,10 +125,6 @@ predecessors did.
 | optional
 | community health file; GitHub accepts it at root, docs/ or .github/
 
-| `archetypes/`
-| optional
-| template-only variation seam (ADR-0003); `just repo-init` removes it from minted repos
-
 | `benches/`
 | optional
 | Cargo-conventional at package root
@@ -157,17 +157,21 @@ predecessors did.
 | yes
 | --setup/--doctor/--heal/--ai-setup (launcher-standard 0.6.0); the one file a newcomer runs first
 
-| `mise.lock`
-| yes
-| makes latest concrete: version + per-platform checksum; mise reads it beside mise.toml
-
 | `mise.toml`
 | yes
 | the toolchain: every tool at latest (PROVISIONING-STANDARD §4)
 
-| `rsr-template-repo_chora.deed`
-| yes
-| the repo deed: universal AI entry point; family-7 allocation manifest + ply tree folded in (standards#837 pilot). Filename carries the repo slug (deed dispatch <stem>_chora.deed), so repo-init renames it at mint
+| `mix.exs`
+| optional
+| elixir: Mix reads the project file from the root only, and build/just/provision.just runs mix at the root
+
+| `mix.lock`
+| optional
+| elixir: Mix writes the dependency lock beside mix.exs
+
+| `priv/`
+| optional
+| elixir/OTP: an
 
 | `scripts/`
 | yes
@@ -188,6 +192,10 @@ predecessors did.
 | `tests/`
 | yes
 | -
+
+| `tsunami-breaker_chora.deed`
+| yes
+| the repo deed: universal AI entry point; family-7 allocation manifest + ply tree folded in (standards#837 pilot). Filename carries the repo slug (deed dispatch <stem>_chora.deed), so repo-init renames it at mint
 
 | `verification/`
 | optional
@@ -249,7 +257,6 @@ your own repo - but do not read their emptiness as neglect here.
 | `src/aspects/security/`
 | `src/bridges/`
 | `src/contracts/`
-| `src/core/`
 | `src/definitions/`
 | `src/errors/`
 | `src/interface/generated/`
