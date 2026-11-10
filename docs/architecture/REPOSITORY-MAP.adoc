@@ -157,6 +157,10 @@ predecessors did.
 | yes
 | --setup/--doctor/--heal/--ai-setup (launcher-standard 0.6.0); the one file a newcomer runs first
 
+| `mise.lock`
+| yes
+| makes latest concrete: version + per-platform checksum; mise reads it beside mise.toml
+
 | `mise.toml`
 | yes
 | the toolchain: every tool at latest (PROVISIONING-STANDARD §4)
