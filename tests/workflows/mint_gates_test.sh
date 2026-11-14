@@ -213,7 +213,11 @@ rm -f "$M/mise.toml"
 expect_fail "mise gate fails when mise.toml is missing" mise --root "$M" --langs julia --tools "julia just"
 
 # The template's own toolchain must match its own languages.
-expect_pass "mise gate passes on the template tree" mise --root "$REPO_DIR"
+if bash "$REPO_DIR/scripts/is-template-tree.sh" "$REPO_DIR"; then
+    expect_pass "mise gate passes on the template tree" mise --root "$REPO_DIR"
+else
+    echo "  SKIP  mise gate on the template tree (not the template tree)"
+fi
 
 # A backend-qualified tool MUST be a quoted TOML key ("npm:prettier"), so a
 # parser that only read bare keys could never see the banned tool this gate
@@ -236,11 +240,42 @@ printf '[tools]\njust = "latest"\nshellcheck = "latest"\nyq = "latest"\ntrivy = 
 expect_pass "--detect finds markers below the root, as provision-lib does" \
     mise --root "$DD" --detect
 
+# A Julia package whose Project.toml is not at the root (src/julia/Project.toml,
+# depth 3) must be detected by BOTH detectors, with the same answer; one under an
+# excluded tree (node_modules) must not be.
+JD="$WORK/julia-depth"; mkdir -p "$JD/src/julia" "$JD/build/just"
+cp "$REPO_DIR/build/just/provision-lib.sh" "$JD/build/just/"
+printf 'name = "Demo"\n' > "$JD/src/julia/Project.toml"
+printf '[tools]\njust = "latest"\nshellcheck = "latest"\nyq = "latest"\njulia = "latest"\n' > "$JD/mise.toml"
+expect_pass "mise gate (engine) detects julia at src/julia/Project.toml" mise --root "$JD"
+rm -rf "$JD/build"
+printf '[tools]\njust = "latest"\nshellcheck = "latest"\nyq = "latest"\ntrivy = "latest"\njulia = "latest"\n' > "$JD/mise.toml"
+expect_pass "mise gate (--detect mirror) detects julia at src/julia/Project.toml" mise --root "$JD" --detect
+# Same julia mise.toml, but the only Project.toml sits under node_modules: julia is
+# then declared for no detected language, which is the finding to look for.
+JV="$WORK/julia-vendored"; mkdir -p "$JV/node_modules/dep" "$JV/build/just"
+cp "$REPO_DIR/build/just/provision-lib.sh" "$JV/build/just/"
+printf 'name = "Dep"\n' > "$JV/node_modules/dep/Project.toml"
+printf '[tools]\njust = "latest"\nshellcheck = "latest"\nyq = "latest"\ntrivy = "latest"\njulia = "latest"\n' > "$JV/mise.toml"
+out_v="$(mise --root "$JV" 2>&1)"
+if grep -q 'declared for no detected language: julia' <<<"$out_v"; then
+    pass "mise gate (engine) ignores a vendored Project.toml"
+else bad "mise gate (engine) ignores a vendored Project.toml"; fi
+rm -rf "$JV/build"
+out_v="$(mise --root "$JV" --detect 2>&1)"
+if grep -q 'declared for no detected language: julia' <<<"$out_v"; then
+    pass "mise gate (--detect mirror) ignores a vendored Project.toml"
+else bad "mise gate (--detect mirror) ignores a vendored Project.toml"; fi
+
 echo ""
 echo "── Mint tokens ────────────────────────────────────────────"
 
+if bash "$REPO_DIR/scripts/is-template-tree.sh" "$REPO_DIR"; then
 expect_pass "token gate passes on the template" \
     bash "$REPO_DIR/scripts/check-mint-tokens.sh" --quiet --root "$REPO_DIR"
+else
+    echo "  SKIP  token gate on the template (not the template tree)"
+fi
 
 T="$WORK/tokens"; mkdir -p "$T/scripts" "$T/build/just" "$T/.machine_readable"
 cp "$REPO_DIR/build/just/repo-init.just" "$T/build/just/"
