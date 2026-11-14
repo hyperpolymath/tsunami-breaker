@@ -504,6 +504,7 @@ defmodule TsunamiBreakerWeb.DashboardLive do
         <div :for={p <- a.proposals} class="proposal">
           <strong>{p.title}</strong>
           <div class="small">{p.detail}</div>
+          <a :if={p[:url]} class="small" href={p.url} target="_blank" rel="noopener">{p.url}</a>
           <div class="small muted">Reversible: {p.reversible}</div>
         </div>
       </section>

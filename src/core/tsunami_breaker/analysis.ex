@@ -139,7 +139,33 @@ defmodule TsunamiBreaker.Analysis do
     q = a.lane_counts.quarantine
     flood_gates = (a.chain.flood && a.chain.flood.gates) || []
 
+    login = a.viewer.login
+
     [
+      # Each failed run is a new thread, so a per-thread unsubscribe can never
+      # end the flood. The account switch is the one control that does.
+      flood_gates != [] &&
+        %{
+          title: "Suspend the flood now: turn off GitHub Actions notifications",
+          detail:
+            "Each failed run is a new thread, so unsubscribe from one thread does not stop the next. " <>
+              "On GitHub: Settings, Notifications, System, Actions. Clear \"On GitHub\" and \"Email\". " <>
+              "No workflow is disabled; the runs continue and the pings stop.",
+          url: "https://github.com/settings/notifications",
+          reversible: "Yes: set the two boxes again."
+        },
+      # To archive a notification does not close its PR. This list ignores the inbox.
+      is_binary(login) &&
+        %{
+          title: "Find open PRs you archived by accident",
+          detail:
+            "This search lists every open PR that involves #{login}, drafts included, " <>
+              "whatever the state of the notification.",
+          url:
+            "https://github.com/pulls?q=" <>
+              URI.encode_www_form("is:open is:pr involves:#{login} -author:app/dependabot"),
+          reversible: "Yes: it is a search only."
+        },
       q > 0 &&
         %{
           title: "Mark #{q} quarantined notification#{s(q)} as done on GitHub",

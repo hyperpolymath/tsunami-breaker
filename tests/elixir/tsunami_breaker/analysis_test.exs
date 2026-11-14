@@ -22,6 +22,12 @@ defmodule TsunamiBreaker.AnalysisTest do
            ]
   end
 
+  test "proposes the account switch first, then the PR recovery search", %{a: a} do
+    assert [suspend, recover | _] = a.proposals
+    assert suspend.url == "https://github.com/settings/notifications"
+    assert recover.url =~ "involves%3Ahyperpolymath"
+  end
+
   test "singles out marches Actions lock failing on main, and nothing else", %{a: a} do
     assert [an] = a.anomalies
     assert an.key == {"hyperpolymath/marches", "Actions lock", "main"}
