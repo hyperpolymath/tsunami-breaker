@@ -12,8 +12,9 @@
 # child. Both recipes call this after their substitution pass.
 #
 # The formatter needs a yq that writes KYAML (mikefarah yq; mise.toml provides
-# it). Both recipes run `--preflight` BEFORE they write anything, so a missing
-# yq stops them with the tree untouched instead of half-minted.
+# it). `container-init` runs `--preflight` before it writes; `repo-init` runs it
+# through scripts/check-mint-tools.sh, before it writes anything, so a missing
+# yq stops either with the tree untouched instead of half-minted.
 #
 # The values fill double-quoted KYAML scalars, so a quote or backslash in one
 # would leave a file the formatter refuses after the tree is written. Both
@@ -95,10 +96,10 @@ for f in build/container/compose.yaml build/container/compose.example.yaml \
 done
 [ "${#files[@]}" -gt 0 ] || exit 0
 
-if ! command -v yq >/dev/null 2>&1 || ! printf 'a: 1\n' | yq -p yaml -o kyaml '.' >/dev/null 2>&1; then
+if ! command -v yq >/dev/null 2>&1 || ! yq --version 2>&1 | grep -q mikefarah || ! printf 'a: 1\n' | yq -p yaml -o kyaml '.' >/dev/null 2>&1; then
     {
         echo "error: the container configs need a yq that writes KYAML (mikefarah yq"
-        echo "  v4.53.3+) once their tokens are filled, and none is on PATH."
+        echo "  v4.53.3+) once their tokens are filled, and the yq on PATH is not one (or none is)."
         echo "  Run 'mise install' (mise.toml provides yq), or install mikefarah yq."
     } >&2
     exit 1

@@ -106,13 +106,12 @@ repo-init archetype="":
     fi
     TEMPLATE_SLUG="${TEMPLATE_OWNER}/${TEMPLATE_REPO}"
 
-    # --- Only a template can be minted (until chain minting lands) ------------
+    # --- A template is minted; a minted repo is minted as a chain ------------
     # A minted repo has already filled its tokens and deleted build/templates,
-    # so minting it again renders none of the new answers and skips the
-    # identity splice: the grandchild silently inherited its parent's author,
-    # contacts, clade and maturity (Codex review of #251). The owner chose to
-    # support chains properly (2026-11-04); until a minted repo carries the
-    # pristine inputs that makes possible, stop here, before anything is
+    # so minting it like a template renders none of the new answers and skips
+    # the identity splice: the grandchild silently inherited its parent's
+    # author, contacts, clade and maturity (Codex review of #251). So it is
+    # never minted that way: it is chain-minted, or refused, before anything is
     # asked or written. A variant template keeps build/templates and still mints.
     #
     # Chain minting (owner ruling 2026-11-04): a minted repo that recorded its
@@ -125,10 +124,19 @@ repo-init archetype="":
     # (or a variant template, which is maintained, never minted) records no
     # (mint-answers). A minted repo that added build/templates/identity.deed.in
     # back as its own work is still a minted repo (Codex review of #277).
+    # The recorded state alone decides; the chain script's presence does not:
+    # a minted repo that deleted scripts/chain-mint.sh is still minted, and
+    # minting it as a template would keep its author and contacts (Codex
+    # review of #277). It is refused instead.
     CHAIN_MINT=0
     _prov_deed="$(bash scripts/deed-field.sh --find . 2>/dev/null || true)"
     if [ -n "$_prov_deed" ] && bash scripts/deed-field.sh --has "$_prov_deed" mint-answers \
-       && [ -f scripts/chain-mint.sh ]; then
+       && [ ! -f scripts/chain-mint.sh ]; then
+        echo "Error: this tree is a minted repo (its deed records (mint-answers)), but"
+        echo "       scripts/chain-mint.sh, which mints a minted repo again, is absent."
+        echo "       Restore it from the template, or mint from the template itself."
+        exit 1
+    elif [ -n "$_prov_deed" ] && bash scripts/deed-field.sh --has "$_prov_deed" mint-answers; then
         CHAIN_MINT=1
         echo "This tree is a minted repo (${TEMPLATE_SLUG}): it will be minted as a chain,"
         echo "from its template, carrying its own work since its mint."
@@ -190,6 +198,16 @@ repo-init archetype="":
             exit 1
         fi
     fi
+
+    # ── Are the tools the mint needs LATER present? ─────────────────────────
+    # The mint writes the tree first and reaches a KYAML-capable yq
+    # (format-container-kyaml.sh) and nickel (the arrival pack) afterwards; a
+    # missing one used to stop it after 100+ files were rewritten. Every mint
+    # kind (plain, archetype, chain) reaches both steps, so none is exempt;
+    # the script demands a tool only when its step can run (see its header).
+    [ -f scripts/check-mint-tools.sh ] \
+        || { echo "Error: scripts/check-mint-tools.sh is missing; the mint cannot check its tools."; exit 1; }
+    bash scripts/check-mint-tools.sh . || exit 1
     mint_files() {
         git ls-files -z --cached --others --exclude-standard \
             | while IFS= read -r -d '' _f; do
@@ -389,18 +407,23 @@ repo-init archetype="":
     CURRENT_YEAR="${CURRENT_DATE:0:4}"
     VERSION="0.1.0"
 
-    # --- Derive the repo's uuid --------------------------------------------
-    # THE UUID IS DERIVED, NOT ALLOCATED (gv-clade-index:
-    # docs/SPEC-clade-verisim-portal.adoc §Identity Model):
-    #     uuid = UUIDv5(namespace = URL, name = "github.com/<owner>/<name>")
-    # We know OWNER and REPO, so this is computable here and must never be
-    # guessed or copied. The owner segment is part of the derived name, so it is
-    # part of the identity — a repo hosted elsewhere derives a different uuid.
-    if command -v uuidgen >/dev/null 2>&1; then
-        REPO_UUID=$(uuidgen --sha1 --namespace @url --name "${FORGE}/${OWNER}/${REPO}")
-    else
-        REPO_UUID="UNASSIGNED"
-    fi
+    # --- Mint the repo's chora id ----------------------------------------
+    # The chora id is minted ONCE, here, from the repo's birth path, and is
+    # carried opaquely as :repo-uuid #uuid"<id>" (standards A1 rules U1 to U4
+    # and V8, A7 J11). It is the ADR-008 profile C UUIDv8 of the birth path in
+    # the domain chora-registry (owner ruling V9, 2026-11-13: new ids only; ids
+    # minted earlier keep their gv-clade-index id and are never reminted):
+    #     first 16 bytes of SHA-256("chora-registry:<forge>/<owner>/<name>"),
+    #     version 8, variant 10
+    # (scripts/uuid-v8.sh, equal to standards scripts/uuid-v8.js c, tested by
+    # tests/workflows/uuid_v8_test.sh). It is computed the same way on every
+    # machine, so the drift gate's replay agrees with the mint. Nothing
+    # re-derives it later: a transfer or rename never changes it (U1).
+    REPO_UUID="$(bash scripts/uuid-v8.sh chora-registry "${FORGE}/${OWNER}/${REPO}")" || {
+        echo "Error: the repo id is minted as a UUIDv8 (SHA-256), and this machine"
+        echo "       has none of sha256sum, shasum or openssl to mint it with."
+        exit 1
+    }
 
     # Derive citation name parts (best-effort split on last space)
     AUTHOR_LAST="${AUTHOR##* }"
@@ -435,6 +458,10 @@ repo-init archetype="":
                 WEBSITE SERVICE_NAME PORT REGISTRY AUTHOR_EMAIL_ALT AUTHOR_ORCID OPENSSF_BP_ID; do
         case "${!_ans:-}" in
             *$'\n'*) echo "Error: the answer for $_ans contains a newline; answers are one line."; exit 1 ;;
+            # 0x01 is the record separator deed-field.sh and deed-clause.sh read the
+            # deed with: an answer holding it renders everywhere, then cannot be
+            # recorded in (mint-answers) (Codex review of #275).
+            *$'\001'*) echo "Error: the answer for $_ans contains byte 0x01, which the deed cannot record."; exit 1 ;;
         esac
     done
 
@@ -651,12 +678,18 @@ repo-init archetype="":
     # would be silently discarded. It is refused by name, before anything is
     # written (Codex review of #275), whatever writes it.
     # _same A B — identical as git records them: content, executable bit, link target.
+    # As scripts/check-mint-drift.sh's same(): a link target is read with a
+    # sentinel (command substitution strips trailing newlines), and the
+    # executable bit is the owner's (0100), as git records it, not `-x`
+    # (effective access, true as root for a group-executable file) (Codex
+    # review of #275).
+    _ux() { [ -n "$(find "$1" -prune -perm -0100 2>/dev/null)" ]; }
     _same() {
         if [ -L "$1" ] || [ -L "$2" ]; then
-            [ -L "$1" ] && [ -L "$2" ] && [ "$(readlink "$1")" = "$(readlink "$2")" ]
+            [ -L "$1" ] && [ -L "$2" ] && [ "$(readlink "$1"; echo .)" = "$(readlink "$2"; echo .)" ]
             return
         fi
-        { [ -x "$1" ] && [ -x "$2" ]; } || { [ ! -x "$1" ] && [ ! -x "$2" ]; } || return 1
+        { _ux "$1" && _ux "$2"; } || { ! _ux "$1" && ! _ux "$2"; } || return 1
         cmp -s "$1" "$2"
     }
     _REPLAY=""
@@ -693,7 +726,16 @@ repo-init archetype="":
             fi
             _rgi "$_rp/index" checkout-index -a -f --prefix="$2/"
             rm -f "$_rp/index"
-            _rg -C "$2" init -q -b main; _rg -C "$2" add -A; _rg -C "$2" commit -q -m "Initial commit"
+            # Forced, then checked to BE the tree: a file the tree tracks although
+            # its .gitignore matches it is still copied by "Use this template"
+            # (Codex and CodeRabbit review of #277).
+            _rg -C "$2" init -q -b main; _rg -C "$2" add -f -A
+            if [ "$(_rg -C "$2" write-tree)" != "$(_rgi "$_rp/index" rev-parse "$1^{tree}")" ]; then
+                echo "ERROR: the checkout of the tree does not read back as itself (an attribute"
+                echo "       rewrites a file), so this mint cannot be replayed exactly."
+                return 1
+            fi
+            _rg -C "$2" commit -q -m "Initial commit"
             _rg -C "$2" remote add origin "git@${FORGE}:${OWNER}/${REPO}.git"
             (cd "$2" && env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
                 ${RUSTUP_HOME:+RUSTUP_HOME="$RUSTUP_HOME"} ${CARGO_HOME:+CARGO_HOME="$CARGO_HOME"} \
@@ -933,9 +975,10 @@ repo-init archetype="":
     # DETERMINISTIC: bytes 0..15 of SHA-256("julia-package-identity" ":"
     # "github.com/<owner>/<name>"), version nibble 8, variant 10 -- stable
     # across re-mints of the same repo, derivable by any operator machine
-    # with python3 (or bun over standards' scripts/uuid-v8.js), never
-    # colliding with the repo uuid. The domain is REGISTERED in standards'
-    # ADR-008-profile-c-domains.json. No python3 and no bun -> UNASSIGNED
+    # with a SHA-256 tool (scripts/uuid-v8.sh) or bun over standards'
+    # scripts/uuid-v8.js, never colliding with the repo uuid. The domain is
+    # REGISTERED in standards' ADR-008-profile-c-domains.json. No SHA-256
+    # tool and no bun -> UNASSIGNED
     # (the honest fallback at :437); Pkg then refuses the package loudly
     # until the owner assigns one.
     if [ "$ARCHETYPE" = "julia-library" ]; then
@@ -944,27 +987,22 @@ repo-init archetype="":
         OWNER_LC=$(printf '%s' "${OWNER}" | tr '[:upper:]' '[:lower:]')
         # A replay supplies the uuid the mint recorded ((mint-answers
         # :package-uuid)), so the drift gate does not depend on which of bun or
-        # python3 the checking host has (Codex review of #275). Only a replay:
+        # a SHA-256 tool the checking host has (Codex review of #275). Only a replay:
         # an ordinary mint always derives it, so a stray RSR_PACKAGE_UUID in the
         # environment cannot write an unrelated identity into Project.toml.
         if [ "${RSR_MINT_REPLAY:-0}" = "1" ] && [[ "${RSR_PACKAGE_UUID:-}" =~ ^(UNASSIGNED|[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$ ]]; then
             PACKAGE_UUID="$RSR_PACKAGE_UUID"
         elif command -v bun >/dev/null 2>&1 && [ -f "${STANDARDS_UUID_V8_JS:-}" ]; then
             PACKAGE_UUID=$(bun "${STANDARDS_UUID_V8_JS}" c julia-package-identity "github.com/${OWNER_LC}/${REPO}")
-        elif command -v python3 >/dev/null 2>&1; then
-            PACKAGE_UUID=$(python3 -c '
-    import hashlib, sys
-    pre = ("julia-package-identity:github.com/%s/%s" % (sys.argv[1], sys.argv[2])).encode()
-    b = bytearray(hashlib.sha256(pre).digest()[:16])
-    b[6] = (b[6] & 0x0F) | 0x80   # version 8
-    b[8] = (b[8] & 0x3F) | 0x80   # variant 10
-    h = b.hex()
-    print(f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}")' "${OWNER_LC}" "${REPO}")
+        elif command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1; then
+            # The same ADR-008 profile C id in shell (scripts/uuid-v8.sh, equal to
+            # standards uuid-v8.js c). No Python: the estate bans it.
+            PACKAGE_UUID=$("${BASH:-bash}" scripts/uuid-v8.sh julia-package-identity "github.com/${OWNER_LC}/${REPO}")
         else
             PACKAGE_UUID=UNASSIGNED
         fi
         SED_ARGS+=(-e "s|${LB}PACKAGE_UUID${RB}|${PACKAGE_UUID}|g")
-        echo "  package uuid: ${PACKAGE_UUID} (derived from repo uuid ${REPO_UUID})"
+        echo "  package uuid: ${PACKAGE_UUID} (minted from the birth path, beside chora id ${REPO_UUID})"
     fi
 
     # Optional values with no answer: drop the line that depends on them rather
@@ -1184,6 +1222,13 @@ repo-init archetype="":
         # The same declaration forms the identity parser accepts: optional
         # `export`, either quote (Codex review of #274).
         sed -i -E "$SELF_OWNER_SED" Justfile sonar-project.properties
+        # The deed's document ids hold the repo slug (ADR-008 profile C, domain
+        # repo-document). The self-name pass rewrites it, but only when the repo name
+        # changes; a mint under the SAME name and a different owner skips that pass
+        # and would keep the template's owner in its ids. Followed here, narrowly.
+        if [ -f "${REPO}_chora.deed" ]; then
+            sed -i -E "s|(repo-document:github\\.com/)${TEMPLATE_OWNER//./\\.}/|\\1$(sed_rhs "${OWNER}")/|g" "${REPO}_chora.deed"
+        fi
         echo "  self-owner: rewrote ${TEMPLATE_OWNER} -> ${OWNER} (estate dependency paths preserved)"
         echo "  NOTE: confirm the SonarCloud ORG is really '${OWNER}' before provisioning —"
         echo "        the GitHub owner and the SonarCloud org are not always the same."
@@ -1209,7 +1254,7 @@ repo-init archetype="":
     # description stays UNASSIGNED for the author.
     # The split is the whole point:
     #   DERIVABLE -> computed, never guessed  (uuid name, owner, canonical-name)
-    #   JUDGEMENT -> left UNASSIGNED, fails loudly until a human chooses (clade)
+    #   JUDGEMENT -> left to the author; a clade placement is an optional identity fact, never written here
     ID_IN="build/templates/identity.deed.in"
     # Whatever one deed is present (renamed for the child above, or already
     # named for it): never a hardcoded template file name.
@@ -1228,26 +1273,20 @@ repo-init archetype="":
         ' "$DEED" > "$DEED.splice"
         cat "$DEED.splice" > "$DEED"     # keeps the file's mode
         rm -f "$DEED.splice"
-        # The uuid5 name. The self-name pass already rewrote owner and slug in
-        # it; the forge domain is set here, because nothing else knows it.
-        sed -i -E 's|^(  :repo-uuid #u5")[^"]*"|\1'"${FORGE}/${OWNER}/${REPO}"'"|' "$DEED"
+        # The chora id, minted above from the birth path and written once as an
+        # opaque #uuid literal. It replaces the template's own id (whatever its
+        # literal form) so a child never carries the template's identity.
+        sed -i -E 's,^(  :repo-uuid )#(uuid|u5|u8)"[^"]*",\1#uuid"'"${REPO_UUID}"'",' "$DEED"
         # The template's journal is not the child's: install the stub.
         mkdir -p docs/status
         cp build/templates/ROADMAP.adoc.in docs/status/ROADMAP.adoc
         rm -rf build/templates          # template-only; not part of your repo
-        if [ "$REPO_UUID" = "UNASSIGNED" ]; then
-            echo "  uuid:  UNASSIGNED — uuidgen not found."
-            echo "         Install util-linux (uuid-runtime), then check it with:"
-            echo "           uuidgen --sha1 --namespace @url --name \"${FORGE}/${OWNER}/${REPO}\""
-        else
-            echo "  uuid:  $REPO_UUID"
-            echo "         (uuid5 of ${FORGE}/${OWNER}/${REPO} — derived from the deed's"
-            echo "          :repo-uuid name, recomputable, not stored, not invented)"
-        fi
-        echo "  clade: UNASSIGNED — a human must choose one of the 12."
-        echo "         just validate-rsr FAILS until you do. That is deliberate:"
-        echo "         an unchosen clade must not look like a chosen one."
-        echo "         The taxonomy is listed in the (clade …) comment of $DEED."
+        echo "  uuid:  $REPO_UUID"
+        echo "         (the chora id: UUIDv8 of the birth path ${FORGE}/${OWNER}/${REPO},"
+        echo "          minted once and written to :repo-uuid; a rename never changes it)"
+        echo "  clade: none written. Identity is the chora id above; a clade placement is an"
+        echo "         optional identity fact. The 12 are listed in the identity comment"
+        echo "         of $DEED; validate-rsr checks one only if you declare it."
     fi
 
     echo "── Profile & provenance (ADR-0003) ──────────────"
@@ -1283,7 +1322,7 @@ repo-init archetype="":
     # deed's one (canon …) clause, or nothing when the clause or key is
     # absent or the clause is not unique. A ";" outside a string starts a
     # comment that runs to line-end (deed.abnf), whole-line or inline. The SAME function is in
-    # .github/workflows/dogfood-gate.yml and standards
+    # scripts/canon-pin-check.sh and standards
     # scripts/check-canon-lockstep.sh; keep the three identical.
     deed_canon() {
         _clauses="$(awk 'BEGIN { bs = sprintf("%c", 92); dq = sprintf("%c", 34) } { o = ""; q = 0; for (i = 1; i <= length($0); i++) { c = substr($0, i, 1); if (q && c == bs) { o = o c substr($0, i + 1, 1); i++; continue } if (c == dq) q = !q; else if (!q && c == ";") break; o = o c } printf "%s ", o }' "$2" | grep -oE '[(]canon[[:space:]][^()]*[)]')" || true
@@ -1508,6 +1547,13 @@ repo-init archetype="":
         echo "              from a template commit that has one."
     else
         echo "  provenance: $DEED_OUT (provenance)  (canon v${CANON_VERSION} ${CANON_CRITERIA_SHA:0:12})"
+        CANON_PROPOSED_BY="$(deed_canon proposed-by "$DEED_OUT")"
+        if [ -n "$CANON_PROPOSED_BY" ]; then
+            echo "  WARNING:    the template pins canon v${CANON_VERSION} ahead of its release"
+            echo "              (:proposed-by \"${CANON_PROPOSED_BY}\"). This repo inherits that pin;"
+            echo "              its Canon lockstep passes only while that canon PR is open and"
+            echo "              unchanged, and once it merges. Re-mint or re-pin if it is closed."
+        fi
     fi
 
     # archetypes/ is template-only overlay data, not part of your repo
@@ -1571,6 +1617,32 @@ repo-init archetype="":
         fi
     fi
 
+    # ── Cargo.lock (rust-cli, or any overlay that ships a Cargo.toml) ───────
+    # The overlay ships Cargo.toml.in only. The minted rust-ci.yml runs clippy,
+    # check and test with --locked, which REFUSES to run without a Cargo.lock,
+    # so a fresh mint failed its own CI on the first push. A lock cannot be
+    # shipped as a template: it records the package name, which is the repo
+    # slug and only known now. It is therefore generated here from the
+    # substituted manifest. With no [dependencies] the resolution needs no
+    # network, so this works offline; a missing cargo is a hard error, not a
+    # skipped step (fail loudly: a repo minted without its lock is red in CI).
+    if [ -f Cargo.toml ] && [ ! -f Cargo.lock ]; then
+        echo ""
+        echo "── Cargo.lock ───────────────────────────────────"
+        if ! command -v cargo >/dev/null 2>&1; then
+            echo "ERROR: this mint ships a Cargo.toml, so it must also ship a Cargo.lock"
+            echo "       (the minted CI builds with --locked), and cargo is not on PATH."
+            echo "       Install a Rust toolchain (rustup) and re-run the mint."
+            exit 1
+        fi
+        cargo generate-lockfile || {
+            echo "ERROR: cargo generate-lockfile failed; the minted CI would fail on --locked."
+            exit 1
+        }
+        [ -f Cargo.lock ] || { echo "ERROR: cargo reported success but wrote no Cargo.lock."; exit 1; }
+        echo "  generated: Cargo.lock"
+    fi
+
     # ── www/ site-operations bundle (issue #53, stage 5) ──────────────────
     #
     # A repository minted from this template already carries www/.well-known/
@@ -1590,7 +1662,7 @@ repo-init archetype="":
     if [ -d .well-known ] && [ -f scripts/migrate-wellknown-to-www.sh ]; then
         echo ""
         echo "Migrating legacy root .well-known/ into www/.well-known/..."
-        bash scripts/migrate-wellknown-to-www.sh
+        bash scripts/migrate-wellknown-to-www.sh --date "$CURRENT_DATE"
     fi
 
     # ── Toolchain (mise.toml) ───────────────────────────────────────────────
@@ -1900,7 +1972,7 @@ repo-init archetype="":
     echo "       gh repo edit ${OWNER}/${REPO} --description '<one line>' --homepage '${WEBSITE}'"
     echo "     Visibility is fail-closed private; flip deliberately if wanted:"
     echo "       gh repo edit ${OWNER}/${REPO} --visibility public --accept-visibility-change-consequences"
-    echo "     Register in gv-clade-index; required contexts must equal emitted job ids."
+    echo "     Register in chora-registry (formerly gv-clade-index); required contexts must equal emitted job ids."
     if [ -f ci/.gitlab-ci.yml ]; then
         echo ""
         echo "     GitLab mirror only: this repo keeps its GitLab CI config at"
