@@ -2,8 +2,8 @@
 -- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 ||| Foreign Function Interface Bridge
 |||
-||| Raw FFI calls into lib{{project}} (src/interface/ffi/src/main.zig) and their
-||| safe wrappers. Every `%foreign "C:<symbol>,lib{{project}}"` below names a
+||| Raw FFI calls into libtsunami_breaker (src/interface/ffi/src/main.zig) and their
+||| safe wrappers. Every `%foreign "C:<symbol>,libtsunami_breaker"` below names a
 ||| symbol that main.zig `export fn`s; tests/aspect_tests.sh (Aspect 3) fails
 ||| if one does not. The symbols and the Result codes follow main.zig; the
 ||| template once bound rsr_* in librsr, which nothing exported.
@@ -20,15 +20,15 @@ import Abi.Layout
 --------------------------------------------------------------------------------
 
 ||| Raw FFI call to initialize the library (Zig: returns ?*Handle, null on failure)
-%foreign "C:{{project}}_init,lib{{project}}"
+%foreign "C:tsunami_breaker_init,libtsunami_breaker"
 prim__init : PrimIO Bits64
 
 ||| Raw FFI call to free library resources (Zig: accepts null)
-%foreign "C:{{project}}_free,lib{{project}}"
+%foreign "C:tsunami_breaker_free,libtsunami_breaker"
 prim__free : Bits64 -> PrimIO ()
 
 ||| Raw FFI call: 1 if the handle is initialised, else 0
-%foreign "C:{{project}}_is_initialized,lib{{project}}"
+%foreign "C:tsunami_breaker_is_initialized,libtsunami_breaker"
 prim__isInitialized : Bits64 -> PrimIO Bits32
 
 ||| Safe wrapper for initialization
@@ -60,7 +60,7 @@ isInitialized h = do
 ||| of the return register is unspecified for an `int` return). It is
 ||| `Bits32`, not `Int32`, because RefC in Idris2 0.7.0 cannot generate code
 ||| for an `Int32` foreign return; see Abi.Types.resultCode.
-%foreign "C:{{project}}_process,lib{{project}}"
+%foreign "C:tsunami_breaker_process,libtsunami_breaker"
 prim__process : Bits64 -> Bits32 -> PrimIO Bits32
 
 ||| Safe wrapper. Right () on code 0; Left on any other known code; an
@@ -79,11 +79,11 @@ process h input = do
 --------------------------------------------------------------------------------
 
 ||| Get the last error message, if any (Zig: thread-local, no handle argument)
-%foreign "C:{{project}}_last_error,lib{{project}}"
+%foreign "C:tsunami_breaker_last_error,libtsunami_breaker"
 prim__lastError : PrimIO (Ptr String)
 
 ||| Library version string (static storage on the Zig side)
-%foreign "C:{{project}}_version,lib{{project}}"
+%foreign "C:tsunami_breaker_version,libtsunami_breaker"
 prim__version : PrimIO (Ptr String)
 
 ||| Detailed error string helper, one line per Result constructor
@@ -109,4 +109,4 @@ errorDescription NullPointer = "Null pointer"
 |||    and is injective (Abi.Types.resultCodeInjective).
 public export
 abiSafetyGuarantees : String
-abiSafetyGuarantees = "{{project}} ABI: 4 stated safety properties for FFI integration"
+abiSafetyGuarantees = "tsunami_breaker ABI: 4 stated safety properties for FFI integration"
