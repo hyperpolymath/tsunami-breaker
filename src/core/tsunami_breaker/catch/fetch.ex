@@ -50,19 +50,16 @@ defmodule TsunamiBreaker.Catch.Fetch do
         |> Enum.uniq()
         |> Enum.take(max_repos)
 
-      history =
-        Enum.flat_map(repos, fn repo ->
-          case GitHub.workflow_runs(c, repo) do
-            {:ok, runs} ->
-              Enum.map(
-                runs,
-                &ApiNormalizer.workflow_run(Map.put_new(&1, "repository", %{"full_name" => repo}))
-              )
+      lookups_by_repo = Enum.map(repos, &{&1, GitHub.workflow_runs(c, &1)})
 
-            {:error, _} ->
-              []
-          end
-        end)
+      # A repo whose runs could not be read is named, so a partial sweep is
+      # never shown as a clean one.
+      repos_unread = for {repo, {:error, _}} <- lookups_by_repo, do: repo
+
+      history =
+        for {repo, {:ok, runs}} <- lookups_by_repo,
+            r <- runs,
+            do: ApiNormalizer.workflow_run(Map.put_new(r, "repository", %{"full_name" => repo}))
 
       # A failed run that no notification reported becomes an event of its own,
       # so the lanes work from the runs and not only from the inbox.
@@ -85,6 +82,7 @@ defmodule TsunamiBreaker.Catch.Fetch do
          history: history,
          repos_scanned: length(repos),
          recent_error: recent_error,
+         repos_unread: repos_unread,
          fetched_at: DateTime.utc_now() |> DateTime.truncate(:second)
        }}
     end

@@ -5,6 +5,8 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/build-notification.yml':
         - 'actions/checkout@v7.0.1'
+    '.github/workflows/ci-gate-tamper-guard-caller.yml':
+        - 'hyperpolymath/proven-cicd-and-workflows@51504ef4a9ede9aa538d9df1254e607982ccc214'
     '.github/workflows/ci-gate.yml':
         - 'hyperpolymath/proven-cicd-and-workflows@51504ef4a9ede9aa538d9df1254e607982ccc214'
     '.github/workflows/codeql.yml':

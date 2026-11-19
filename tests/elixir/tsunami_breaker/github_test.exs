@@ -173,6 +173,28 @@ defmodule TsunamiBreaker.GitHubTest do
     assert res.repos_scanned == 0
   end
 
+  test "a repo whose runs cannot be read is named in the result" do
+    Req.Test.stub(:gh_unread, fn conn ->
+      case conn.request_path do
+        "/user" ->
+          Req.Test.json(conn, %{"login" => "hyperpolymath"})
+
+        "/notifications" ->
+          Req.Test.json(conn, [])
+
+        "/user/repos" ->
+          Req.Test.json(conn, [%{"full_name" => "hyperpolymath/atoma"}])
+
+        "/repos/hyperpolymath/atoma/actions/runs" ->
+          conn |> Plug.Conn.put_status(403) |> Req.Test.json(%{"message" => "nope"})
+      end
+    end)
+
+    assert {:ok, res} = Fetch.run("dummy", plug: {Req.Test, :gh_unread})
+    assert res.repos_unread == ["hyperpolymath/atoma"]
+    assert res.history == []
+  end
+
   test "stops paginating when the API budget is low" do
     Req.Test.stub(:gh_low, fn conn ->
       conn
