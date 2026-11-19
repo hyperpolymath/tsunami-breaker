@@ -155,7 +155,7 @@ defmodule TsunamiBreakerWeb.DashboardLive do
        raw_events: res.events,
        history: res.history,
        source:
-         "GitHub (#{length(res.events)} notifications, run history from #{res.repos_scanned} repos)"
+         "GitHub (#{length(res.events) - res.unheard} notifications, #{res.unheard} failed runs with no notification, runs from #{res.repos_scanned} repos)"
      )
      |> analyse()}
   end

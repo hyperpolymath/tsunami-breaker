@@ -51,6 +51,17 @@ defmodule TsunamiBreaker.Catch.GitHub do
   end
 
   @doc """
+  The repos the viewer can reach, most recently pushed first (one page). This
+  is the repo list that does not depend on notifications: with Actions
+  notifications off, it is the only way to learn where runs happen.
+  """
+  def recent_repos(c, n \\ 25) do
+    with {:ok, repos} <- get(c, "/user/repos", sort: "pushed", per_page: n) |> body() do
+      {:ok, for(%{"full_name" => f} <- List.wrap(repos), do: f)}
+    end
+  end
+
+  @doc """
   Workflow runs for one repo: successes too, and regardless of whether the
   notification was marked done. This is how history behind the Done tab is recovered.
   """

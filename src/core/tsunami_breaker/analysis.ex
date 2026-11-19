@@ -123,6 +123,7 @@ defmodule TsunamiBreaker.Analysis do
         flood > 0 &&
           "#{flood} of the #{total} notifications come from #{n_sessions} #{agent_name} sessions, each working on its own branch. Every time one of them saves work (a push), the estate's checks run on it, fail, and each failure pings you. That's the flood: it's expected traffic, not #{n_sessions} separate problems.",
         Enum.map(a.anomalies, &"Real problem: #{&1.summary}."),
+        never_started(a.events),
         needs > 0 &&
           "#{needs} item#{s(needs)} actually ask#{if needs == 1, do: "s", else: ""} for you (see Needs you).",
         yours > 0 &&
@@ -132,6 +133,24 @@ defmodule TsunamiBreaker.Analysis do
       |> Enum.filter(& &1)
 
     %{headline: headline, plain: plain}
+  end
+
+  # A run that GitHub could not start has a broken workflow file. It fails in 0
+  # seconds on every push until the file is repaired, so it is named apart.
+  defp never_started(events) do
+    checks =
+      events
+      |> Enum.filter(&(&1.conclusion == :startup_failure))
+      |> Enum.map(&{&1.repo, &1.workflow})
+      |> Enum.uniq()
+
+    n = length(checks)
+    repos = checks |> Enum.map(&elem(&1, 0)) |> Enum.uniq() |> length()
+
+    n > 0 &&
+      "#{n} check#{s(n)} in #{repos} repo#{s(repos)} never started: GitHub could not load the workflow file " <>
+        "(a refused action, a pin that is not a commit, a moved reusable workflow, or a lock that does not record a call). " <>
+        "Each one fails again on every push until the file is repaired."
   end
 
   # Read-only build: these are proposals only. Nothing here is ever executed.
