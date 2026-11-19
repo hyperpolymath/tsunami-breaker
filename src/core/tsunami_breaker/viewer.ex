@@ -5,7 +5,8 @@ defmodule TsunamiBreaker.Viewer do
   Dogfood Gate failure can be noise to the estate owner and signal to the
   person maintaining that gate.
 
-  * `agent_branch_prefixes` – branches made by agent sessions (e.g. `claude/`).
+  * `agent_branch_prefixes` – branches made by agent sessions (`claude/`, and `marina/`,
+    which cloud sessions use on this estate). The first one names the agent.
   * `default_branches` – where a failure is never treated as routine.
   * `gate_patterns` – how this estate names its gates (editable, not hard-coded truth).
   * `focus_repos` / `own_branches` – work that should always be lifted for this viewer.
@@ -14,7 +15,7 @@ defmodule TsunamiBreaker.Viewer do
   """
 
   defstruct login: nil,
-            agent_branch_prefixes: ["claude/"],
+            agent_branch_prefixes: ["claude/", "marina/"],
             default_branches: ["main", "master", "trunk"],
             gate_patterns: [~r/\bgate\b/i, ~r/\brules\b/i, ~r/^check:/i],
             gate_min_repos: 3,
