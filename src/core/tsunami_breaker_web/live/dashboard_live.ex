@@ -155,7 +155,10 @@ defmodule TsunamiBreakerWeb.DashboardLive do
        raw_events: res.events,
        history: res.history,
        source:
-         "GitHub (#{length(res.events) - res.unheard} notifications, #{res.unheard} failed runs with no notification, runs from #{res.repos_scanned} repos)"
+         "GitHub (#{length(res.events) - res.unheard} notifications, #{res.unheard} failed runs of checks with no notification, runs from #{res.repos_scanned} repos)",
+       error:
+         res.recent_error &&
+           "The list of your recent repos could not be read (#{format_error(res.recent_error)}). Runs in repos with no notification are NOT shown."
      )
      |> analyse()}
   end

@@ -154,6 +154,25 @@ defmodule TsunamiBreaker.GitHubTest do
     assert Enum.any?(a.diagnosis.plain, &(&1 =~ "1 check in 1 repo never started"))
   end
 
+  test "a failed recent-repos lookup is kept in the result, not hidden" do
+    Req.Test.stub(:gh_norepos, fn conn ->
+      case conn.request_path do
+        "/user" ->
+          Req.Test.json(conn, %{"login" => "hyperpolymath"})
+
+        "/notifications" ->
+          Req.Test.json(conn, [])
+
+        "/user/repos" ->
+          conn |> Plug.Conn.put_status(403) |> Req.Test.json(%{"message" => "nope"})
+      end
+    end)
+
+    assert {:ok, res} = Fetch.run("dummy", plug: {Req.Test, :gh_norepos})
+    assert {:http, 403, _} = res.recent_error
+    assert res.repos_scanned == 0
+  end
+
   test "stops paginating when the API budget is low" do
     Req.Test.stub(:gh_low, fn conn ->
       conn

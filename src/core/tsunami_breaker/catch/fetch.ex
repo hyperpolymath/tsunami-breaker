@@ -36,10 +36,10 @@ defmodule TsunamiBreaker.Catch.Fetch do
 
       # Recently pushed repos are read too, so the sweep still sees runs when
       # Actions notifications are off (a failed lookup only narrows the sweep).
-      recent =
+      {recent, recent_error} =
         case GitHub.recent_repos(c, max_repos) do
-          {:ok, rs} -> rs
-          {:error, _} -> []
+          {:ok, rs} -> {rs, nil}
+          {:error, reason} -> {[], reason}
         end
 
       repos =
@@ -84,6 +84,7 @@ defmodule TsunamiBreaker.Catch.Fetch do
          unheard: length(unheard),
          history: history,
          repos_scanned: length(repos),
+         recent_error: recent_error,
          fetched_at: DateTime.utc_now() |> DateTime.truncate(:second)
        }}
     end

@@ -195,7 +195,7 @@ defmodule TsunamiBreaker.Analysis do
       flood_gates != [] &&
         %{
           title:
-            "Stop #{length(flood_gates)} gate#{s(length(flood_gates))} firing on #{hd(a.viewer.agent_branch_prefixes)}* pushes",
+            "Stop #{length(flood_gates)} gate#{s(length(flood_gates))} firing on #{Enum.map_join(a.viewer.agent_branch_prefixes, " and ", &(&1 <> "*"))} pushes",
           detail:
             "Run them when a PR is opened instead of on every push, so agent sessions don't trigger them per commit. (Layer 5, not in this version.)",
           reversible: "Yes: it is a workflow config change you can revert."
