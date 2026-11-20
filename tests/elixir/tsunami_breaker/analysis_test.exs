@@ -28,6 +28,17 @@ defmodule TsunamiBreaker.AnalysisTest do
     assert recover.url =~ "involves%3Ahyperpolymath"
   end
 
+  test "the gate proposal names every agent branch prefix", %{a: a} do
+    assert Enum.any?(a.proposals, &(&1.title =~ "claude/* and marina/* pushes"))
+  end
+
+  test "marina/ branches count as agent sessions, like claude/" do
+    v = Viewer.new()
+    assert Viewer.agent_branch?(v, "marina/cool-noether-i2rc8g")
+    assert Viewer.agent_branch?(v, "claude/new-session-snuoro")
+    refute Viewer.agent_branch?(v, "main")
+  end
+
   test "singles out marches Actions lock failing on main, and nothing else", %{a: a} do
     assert [an] = a.anomalies
     assert an.key == {"hyperpolymath/marches", "Actions lock", "main"}

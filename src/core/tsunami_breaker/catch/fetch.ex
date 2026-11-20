@@ -14,6 +14,7 @@ defmodule TsunamiBreaker.Catch.Fetch do
   Marking threads done is **not** done here: this version is read-only.
   """
 
+  alias TsunamiBreaker.Event
   alias TsunamiBreaker.Catch.{GitHub, ApiNormalizer}
 
   def run(token, opts \\ []) do
@@ -33,33 +34,55 @@ defmodule TsunamiBreaker.Catch.Fetch do
 
       events = Enum.map(raw, &ApiNormalizer.notification(&1, Map.get(lookups, &1["id"])))
 
+      # Recently pushed repos are read too, so the sweep still sees runs when
+      # Actions notifications are off (a failed lookup only narrows the sweep).
+      {recent, recent_error} =
+        case GitHub.recent_repos(c, max_repos) do
+          {:ok, rs} -> {rs, nil}
+          {:error, reason} -> {[], reason}
+        end
+
       repos =
         events
         |> Enum.filter(&(&1.kind == :workflow_run))
         |> Enum.map(& &1.repo)
+        |> Kernel.++(recent)
         |> Enum.uniq()
         |> Enum.take(max_repos)
 
-      history =
-        Enum.flat_map(repos, fn repo ->
-          case GitHub.workflow_runs(c, repo) do
-            {:ok, runs} ->
-              Enum.map(
-                runs,
-                &ApiNormalizer.workflow_run(Map.put_new(&1, "repository", %{"full_name" => repo}))
-              )
+      lookups_by_repo = Enum.map(repos, &{&1, GitHub.workflow_runs(c, &1)})
 
-            {:error, _} ->
-              []
-          end
-        end)
+      # A repo whose runs could not be read is named, so a partial sweep is
+      # never shown as a clean one.
+      repos_unread = for {repo, {:error, _}} <- lookups_by_repo, do: repo
+
+      history =
+        for {repo, {:ok, runs}} <- lookups_by_repo,
+            r <- runs,
+            do: ApiNormalizer.workflow_run(Map.put_new(r, "repository", %{"full_name" => repo}))
+
+      # A failed run that no notification reported becomes an event of its own,
+      # so the lanes work from the runs and not only from the inbox.
+      # snip: matched per check (repo, workflow, branch), not per run; a check
+      # with one notification keeps its notification count. Match on run id
+      # when the notifications API gives one.
+      heard = MapSet.new(events, &Event.failure_key/1)
+
+      unheard =
+        Enum.filter(
+          history,
+          &(Event.ci_failure?(&1) and not MapSet.member?(heard, Event.failure_key(&1)))
+        )
 
       {:ok,
        %{
          login: user["login"],
-         events: events,
+         events: events ++ unheard,
+         unheard: length(unheard),
          history: history,
          repos_scanned: length(repos),
+         recent_error: recent_error,
+         repos_unread: repos_unread,
          fetched_at: DateTime.utc_now() |> DateTime.truncate(:second)
        }}
     end

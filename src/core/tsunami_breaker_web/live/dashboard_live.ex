@@ -155,7 +155,8 @@ defmodule TsunamiBreakerWeb.DashboardLive do
        raw_events: res.events,
        history: res.history,
        source:
-         "GitHub (#{length(res.events)} notifications, run history from #{res.repos_scanned} repos)"
+         "GitHub (#{length(res.events) - res.unheard} notifications, #{res.unheard} failed runs of checks with no notification, runs from #{res.repos_scanned} repos)",
+       error: sweep_warning(res)
      )
      |> analyse()}
   end
@@ -218,6 +219,21 @@ defmodule TsunamiBreakerWeb.DashboardLive do
     |> Enum.concat(Enum.map(a.lanes.your_work, &Fingerprint.key(&1, a.viewer)))
     |> Enum.concat(Map.keys(a.viewer.overrides))
     |> Enum.find(&(encode_key(&1) == id))
+  end
+
+  # A sweep that could not read everything says so: it must not look clean.
+  defp sweep_warning(res) do
+    [
+      res.recent_error &&
+        "The list of your recent repos could not be read (#{format_error(res.recent_error)}). Runs in repos with no notification are NOT shown.",
+      res.repos_unread != [] &&
+        "The workflow runs of #{length(res.repos_unread)} repo(s) could not be read: #{Enum.join(res.repos_unread, ", ")}. Their failures are NOT shown."
+    ]
+    |> Enum.filter(& &1)
+    |> case do
+      [] -> nil
+      ws -> Enum.join(ws, " ")
+    end
   end
 
   defp format_error({:http, 401, _}),
@@ -357,7 +373,7 @@ defmodule TsunamiBreakerWeb.DashboardLive do
         <h2>When: timing</h2>
         <p class="small">
           <strong>{a.timing.total}</strong>
-          notifications over <strong>{a.timing.span_min} min</strong>:
+          events over <strong>{a.timing.span_min} min</strong>:
           about <strong>{a.timing.per_30_min}</strong>
           per half hour, one every <strong>{a.timing.mean_gap_min} min</strong>
           on average. Longest quiet spell: {a.timing.max_gap_min} min.

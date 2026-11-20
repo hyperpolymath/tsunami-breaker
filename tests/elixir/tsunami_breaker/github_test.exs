@@ -92,6 +92,9 @@ defmodule TsunamiBreaker.GitHubTest do
             |> Req.Test.json([@notif])
           end
 
+        "/user/repos" ->
+          Req.Test.json(conn, [])
+
         "/repos/hyperpolymath/marches/actions/runs" ->
           Req.Test.json(conn, %{"workflow_runs" => [@run]})
 
@@ -109,6 +112,87 @@ defmodule TsunamiBreaker.GitHubTest do
     methods = collect_methods([])
     assert methods != []
     assert Enum.all?(methods, &(&1 == "GET"))
+  end
+
+  test "with no CI notifications, failed runs still come through from the repo list" do
+    Req.Test.stub(:gh_quiet, fn conn ->
+      case conn.request_path do
+        "/user" ->
+          Req.Test.json(conn, %{"login" => "hyperpolymath"})
+
+        "/notifications" ->
+          Req.Test.json(conn, [])
+
+        "/user/repos" ->
+          Req.Test.json(conn, [%{"full_name" => "hyperpolymath/quintessence"}])
+
+        "/repos/hyperpolymath/quintessence/actions/runs" ->
+          Req.Test.json(conn, %{
+            "workflow_runs" => [
+              @run
+              |> Map.delete("repository")
+              |> Map.merge(%{"id" => 2, "conclusion" => "startup_failure"}),
+              @run
+              |> Map.delete("repository")
+              |> Map.merge(%{"id" => 3, "conclusion" => "success", "name" => "Other"})
+            ]
+          })
+      end
+    end)
+
+    assert {:ok, res} = Fetch.run("dummy", plug: {Req.Test, :gh_quiet})
+    assert res.unheard == 1
+
+    assert [%{id: "run:2", conclusion: :startup_failure, repo: "hyperpolymath/quintessence"}] =
+             res.events
+
+    a =
+      TsunamiBreaker.Analysis.run(res.events, TsunamiBreaker.Viewer.new(login: res.login),
+        history: res.history
+      )
+
+    assert Enum.any?(a.diagnosis.plain, &(&1 =~ "1 check in 1 repo never started"))
+  end
+
+  test "a failed recent-repos lookup is kept in the result, not hidden" do
+    Req.Test.stub(:gh_norepos, fn conn ->
+      case conn.request_path do
+        "/user" ->
+          Req.Test.json(conn, %{"login" => "hyperpolymath"})
+
+        "/notifications" ->
+          Req.Test.json(conn, [])
+
+        "/user/repos" ->
+          conn |> Plug.Conn.put_status(403) |> Req.Test.json(%{"message" => "nope"})
+      end
+    end)
+
+    assert {:ok, res} = Fetch.run("dummy", plug: {Req.Test, :gh_norepos})
+    assert {:http, 403, _} = res.recent_error
+    assert res.repos_scanned == 0
+  end
+
+  test "a repo whose runs cannot be read is named in the result" do
+    Req.Test.stub(:gh_unread, fn conn ->
+      case conn.request_path do
+        "/user" ->
+          Req.Test.json(conn, %{"login" => "hyperpolymath"})
+
+        "/notifications" ->
+          Req.Test.json(conn, [])
+
+        "/user/repos" ->
+          Req.Test.json(conn, [%{"full_name" => "hyperpolymath/atoma"}])
+
+        "/repos/hyperpolymath/atoma/actions/runs" ->
+          conn |> Plug.Conn.put_status(403) |> Req.Test.json(%{"message" => "nope"})
+      end
+    end)
+
+    assert {:ok, res} = Fetch.run("dummy", plug: {Req.Test, :gh_unread})
+    assert res.repos_unread == ["hyperpolymath/atoma"]
+    assert res.history == []
   end
 
   test "stops paginating when the API budget is low" do
